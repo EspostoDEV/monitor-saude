@@ -24,8 +24,11 @@ services:
         depends_on:
             - pgsql
             - redis
+        dns:
+            - 8.8.8.8
+            - 1.1.1.1
     pgsql:
-        image: 'postgres:18-alpine'
+        image: 'postgis/postgis:17-3.5-alpine'
         ports:
             - '${FORWARD_DB_PORT:-5432}:5432'
         environment:
