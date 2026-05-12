@@ -15,9 +15,14 @@ return new class extends Migration {
             $table->foreignId('city_id')->constrained()->cascadeOnDelete();
             $table->string('disease_type')->index();
             $table->integer('cases')->unsigned()->default(0);
+            $table->integer('level')->index()->nullable()->comment('Alert level: 1=Green, 2=Yellow, 3=Orange, 4=Red');
+            $table->decimal('incidence', 10, 2)->nullable();
+            $table->decimal('re_inferior', 10, 4)->nullable();
+            $table->decimal('re_superior', 10, 4)->nullable();
+            $table->integer('population')->unsigned()->nullable();
             $table->integer('epi_week')->index();
             $table->integer('year')->index();
-            $table->string('status')->index();
+            $table->string('status')->index()->nullable();
             $table->timestamps();
 
             $table->unique(['city_id', 'disease_type', 'epi_week', 'year'], 'unique_report_index');

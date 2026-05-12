@@ -2,35 +2,33 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\ProcessCityGripeData;
 use App\Models\City;
+use App\Models\EpidemicRecord;
+use App\Services\InfoDengueService;
 use Illuminate\Console\Command;
 
 class SyncEpidemicData extends Command
 {
-    protected $signature = 'sync:gripe {disease=srag}';
-    protected $description = 'Sincroniza dados do InfoGripe (srag, covid19, influenza)';
+    protected $signature = 'sync:epidemic-data {--disease=dengue} {--year=}';
+    protected $description = 'Sync epidemiological data from InfoDengue API';
 
-    public function handle(): void
+    public function handle(InfoDengueService $service)
     {
-        $disease = $this->argument('disease');
+        $disease = $this->option('disease');
+        $year = $this->option('year') ?? now()->year;
 
-        City::all()->each(
-            fn($city) =>
-            ProcessCityGripeData::dispatch($city, $disease)
-        );
+        $cities = City::all();
+        $this->info("Starting sync for {$cities->count()} cities...");
 
-        $this->info("Jobs de sincronização enfileirados para 5.570 cidades.");
-    }
+        $bar = $this->output->createProgressBar($cities->count());
 
-    private function mapStatus(int $level): string
-    {
-        return match ($level) {
-            1 => 'Verde',
-            2 => 'Amarelo',
-            3 => 'Laranja',
-            4 => 'Vermelho',
-            default => 'Indeterminado',
-        };
+        foreach ($cities as $city) {
+            \App\Jobs\ProcessCityEpidemicData::dispatch($city, $disease, $year);
+            $bar->advance();
+        }
+
+        $bar->finish();
+        $this->newLine();
+        $this->info('Jobs dispatched to queue successfully!');
     }
 }
