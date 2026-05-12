@@ -29,7 +29,7 @@ function ChangeView({ center, zoom }) {
     return null;
 }
 
-export default function Dashboard({ records, filters }) {
+export default function Dashboard({ records, filters, stats }) {
     const isStateView = !filters.uf;
     const [hoveredUf, setHoveredUf] = useState(null);
     const [selectedRecord, setSelectedRecord] = useState(null);
@@ -142,7 +142,16 @@ export default function Dashboard({ records, filters }) {
                         <div>
                             <span className="text-[9px] text-slate-500 uppercase font-black tracking-[0.2em] block">Casos Totais</span>
                             <span className="text-xl font-mono font-bold text-white">
-                                {dataList.reduce((acc, curr) => acc + (curr.cases || 0), 0).toLocaleString()}
+                                {(stats?.total_cases || 0).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 border-r border-white/10 pr-8">
+                        <Activity className="text-orange-400" size={20} />
+                        <div>
+                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-[0.2em] block">Novos (Sem. #{stats?.latest_week})</span>
+                            <span className="text-xl font-mono font-bold text-white">
+                                {(stats?.new_cases || 0).toLocaleString()}
                             </span>
                         </div>
                     </div>
@@ -248,15 +257,15 @@ export default function Dashboard({ records, filters }) {
                                                             {selectedRecord.week_range}
                                                         </div>
                                                     </div>
-                                                    <div className="flex justify-between items-end">
+                                                    <div className="grid grid-cols-2 gap-4">
                                                         <div>
-                                                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest block mb-1">Novos Casos</span>
+                                                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-wider block mb-1">Novos Casos</span>
                                                             <div className="text-xl font-mono font-bold text-white">
                                                                 {selectedRecord.cases}
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest block mb-1">Incidência</span>
+                                                            <span className="text-[9px] text-slate-500 uppercase font-black tracking-wider block mb-1">Incidência</span>
                                                             <div className="text-xl font-mono font-bold text-emerald-400">
                                                                 {selectedRecord.incidence}
                                                             </div>
@@ -365,7 +374,7 @@ export default function Dashboard({ records, filters }) {
                     </h2>
                     
                     <div className="space-y-3 overflow-y-auto flex-1 pr-3 custom-scrollbar">
-                        {dataList.sort((a, b) => b.cases - a.cases).map((item) => (
+                        {dataList.sort((a, b) => (b.total_cases || b.cases) - (a.total_cases || a.cases)).map((item) => (
                             <div 
                                 key={isStateView ? item.uf : item.id} 
                                 onClick={() => isStateView ? handleStateClick(item.uf) : setSelectedRecord(item)}
@@ -380,10 +389,16 @@ export default function Dashboard({ records, filters }) {
                                         <h3 className={`font-bold truncate ${selectedRecord?.id === item.id ? 'text-emerald-400' : 'text-slate-200'}`}>
                                             {isStateView ? `Estado de ${item.uf}` : item.city.name}
                                         </h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">
-                                                {item.cases.toLocaleString()} casos • {item.month || '2026'}
-                                            </span>
+                                        <div className="flex items-center gap-3 mt-1.5">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest">Total</span>
+                                                <span className="text-[10px] text-slate-300 font-bold">{(item.total_cases || item.cases).toLocaleString()}</span>
+                                            </div>
+                                            <div className="w-px h-4 bg-white/10" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] text-orange-500/70 font-black uppercase tracking-widest">Novos</span>
+                                                <span className="text-[10px] text-orange-400 font-bold">{(item.new_cases || 0).toLocaleString()}</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${
