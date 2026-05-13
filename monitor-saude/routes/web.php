@@ -1,7 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\SyncStatusController;
 use App\Http\Controllers\EpidemicController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [EpidemicController::class, 'index'])->name('dashboard');
 Route::get('/api/history/{cityId}', [EpidemicController::class, 'history']);
+
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/sync-status', [SyncStatusController::class, 'index'])->name('sync.status');
+    Route::post('/sync-trigger', [SyncStatusController::class, 'sync'])->name('sync.trigger');
+});
