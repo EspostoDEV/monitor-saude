@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\EpidemicRecordResource;
 use App\Models\EpidemicRecord;
+use App\Services\TrendAnalysisService;
+use App\Services\RiskEngineService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -11,6 +13,15 @@ use Illuminate\Http\JsonResponse;
 
 class EpidemicController extends Controller
 {
+    protected TrendAnalysisService $trendService;
+    protected RiskEngineService $riskService;
+
+    public function __construct(TrendAnalysisService $trendService, RiskEngineService $riskService)
+    {
+        $this->trendService = $trendService;
+        $this->riskService = $riskService;
+    }
+
     public function index(Request $request): Response
     {
         $request->validate([
@@ -22,7 +33,7 @@ class EpidemicController extends Controller
         $year = $request->year ?? EpidemicRecord::max('year') ?? 2024;
         $disease = $request->disease ?? 'dengue';
 
-        if ($request->uf) {
+        if ($request->filled('uf')) {
             // Otimização Arquitetural: Totais calculados via Join em vez de Subquery N+1
             $totalsSubquery = EpidemicRecord::query()
                 ->select('city_id', \DB::raw('SUM(cases) as total_cases'))
@@ -44,35 +55,65 @@ class EpidemicController extends Controller
                 ->orderBy('year', 'desc')
                 ->orderBy('epi_week', 'desc')
                 ->get();
+
+            // Otimização: Cache dos cálculos de inteligência epidemiológica (TTL 10 min)
+            $cacheKey = "epi_intel_{$request->uf}_{$year}_{$disease}";
+            $records = \Cache::remember($cacheKey, 600, function() use ($records, $disease) {
+                foreach ($records as $record) {
+                    $record->trend = $this->trendService->calculateTrend($record->city, $disease);
+                    
+                    // Recalcula o nível com o novo motor
+                    $record->level = $this->riskService->getAlertLevel($record->incidence, $record->cases, $record->trend);
+                    $record->status = match($record->level) {
+                        4 => 'Crítico',
+                        3 => 'Alerta',
+                        2 => 'Amarelo',
+                        default => 'Estável'
+                    };
+                    $record->alert_explanation = $this->riskService->getAlertExplanation($record->level, $record->incidence, $record->cases);
+                    $record->trend_explanation = $this->riskService->getTrendExplanation($record->trend, $record->incidence);
+                }
+                return $records->values()->all();
+            });
         } else {
-            // Visão Nacional: Agrupado por Estado com casos totais e novos
-            $latestWeek = EpidemicRecord::where('year', $year)->where('disease_type', $disease)->max('epi_week');
+            // Visão Nacional - Cache por UF
+            $cacheKey = "epi_intel_national_{$year}_{$disease}";
+            $records = \Cache::remember($cacheKey, 600, function() use ($year, $disease) {
+                return EpidemicRecord::query()
+                    ->select('cities.uf')
+                    ->selectRaw('SUM(cases) as total_cases')
+                    ->selectRaw('SUM(CASE WHEN epi_week = (SELECT MAX(epi_week) FROM epidemic_records WHERE year = ?) THEN cases ELSE 0 END) as new_cases', [$year])
+                    ->selectRaw('AVG(incidence) as incidence')
+                    ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
+                    ->where('year', $year)
+                    ->where('disease_type', $disease)
+                    ->groupBy('cities.uf')
+                    ->get()
+                    ->map(function($item) use ($disease) {
+                        $trend = $this->trendService->calculateTrendForUf($item->uf, $disease);
+                        $level = $this->riskService->getAlertLevel($item->incidence, (int)$item->new_cases, $trend);
 
-            $records = EpidemicRecord::query()
-                ->selectRaw('cities.uf')
-                ->selectRaw('SUM(cases) as total_cases')
-                ->selectRaw("SUM(CASE WHEN epi_week = ? THEN cases ELSE 0 END) as new_cases", [$latestWeek])
-                ->selectRaw('AVG(incidence) as incidence')
-                ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
-                ->where('year', $year)
-                ->where('disease_type', $disease)
-                ->groupBy('cities.uf')
-                ->get()
-                ->map(function($item) {
-                    $level = 1;
-                    if ($item->incidence > 600) $level = 4;
-                    elseif ($item->incidence > 300) $level = 3;
-                    elseif ($item->incidence > 100) $level = 2;
+                        $status = match($level) {
+                            4 => 'Crítico',
+                            3 => 'Alerta',
+                            2 => 'Amarelo',
+                            default => 'Estável'
+                        };
 
-                    return [
-                        'uf' => $item->uf,
-                        'total_cases' => (int) $item->total_cases,
-                        'new_cases' => (int) $item->new_cases,
-                        'incidence' => round($item->incidence, 2),
-                        'level' => $level,
-                        'is_state' => true,
-                    ];
-                });
+                        return [
+                            'uf' => $item->uf,
+                            'total_cases' => (int) $item->total_cases,
+                            'new_cases' => (int) $item->new_cases,
+                            'incidence' => round($item->incidence, 2),
+                            'level' => $level,
+                            'status' => $status,
+                            'is_state' => true,
+                            'trend' => $trend,
+                            'alert_explanation' => $this->riskService->getAlertExplanation($level, $item->incidence, (int)$item->new_cases),
+                            'trend_explanation' => $this->riskService->getTrendExplanation($trend, $item->incidence),
+                        ];
+                    })->values()->all();
+            });
         }
 
         $latestWeek = EpidemicRecord::where('year', $year)->where('disease_type', $disease)->max('epi_week');

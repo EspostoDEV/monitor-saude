@@ -42,6 +42,9 @@ class EpidemicRecordResource extends JsonResource
                 'lat' => $this->lat,
                 'lng' => $this->lng,
             ],
+            'trend' => $this->trend ?? 'stable',
+            'alert_explanation' => $this->alert_explanation ?? null,
+            'trend_explanation' => $this->trend_explanation ?? null,
         ];
     }
 }
