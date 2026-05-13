@@ -11,9 +11,14 @@ return new class extends Migration {
         DB::statement('CREATE EXTENSION IF NOT EXISTS postgis');
 
         Schema::table('cities', function (Blueprint $table) {
-            $table->dropColumn(['lat', 'lng']);
-            $table->geography('location', 'point', 4326);
-            $table->spatialIndex('location');
+            if (Schema::hasColumn('cities', 'lat')) {
+                $table->dropColumn(['lat', 'lng']);
+            }
+            
+            if (!Schema::hasColumn('cities', 'location')) {
+                $table->geography('location', 'point', 4326);
+                $table->spatialIndex('location');
+            }
         });
     }
 

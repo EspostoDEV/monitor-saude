@@ -12,20 +12,17 @@ class CitySeeder extends Seeder
 {
     public function run(): void
     {
-        // Dataset confiável com coordenadas de todos os municípios brasileiros
-        $url = 'https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/json/municipios.json';
+        // Dataset local offline-first
+        $path = database_path('data/municipios.json');
         
-        $response = Http::get($url);
-
-        if ($response->failed()) {
-            Log::error("Falha ao baixar dataset de municípios.");
+        if (!file_exists($path)) {
+            Log::error("Arquivo de municípios não encontrado em: $path");
+            $this->command->error("Arquivo de municípios não encontrado!");
             return;
         }
 
-        // Remove BOM if present
-        $body = ltrim($response->body(), "\xef\xbb\xbf");
-        
-        $citiesData = json_decode($body, true);
+        $json = file_get_contents($path);
+        $citiesData = json_decode($json, true);
 
         if (empty($citiesData)) {
             Log::error("JSON de municípios vazio ou inválido.");
