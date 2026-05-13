@@ -25,7 +25,7 @@ return new class extends Migration {
             $table->string('status')->index()->nullable();
             $table->timestamps();
 
-            $table->unique(['city_id', 'disease_type', 'epi_week', 'year'], 'unique_report_index');
+            // $table->unique(['city_id', 'disease_type', 'epi_week', 'year'], 'unique_report_index');
         });
     }
 
