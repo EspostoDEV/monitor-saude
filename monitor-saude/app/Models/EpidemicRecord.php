@@ -25,4 +25,18 @@ class EpidemicRecord extends Model
     {
         return $this->belongsTo(City::class);
     }
+
+    /**
+     * Scope para garantir a unicidade de registros por cidade/semana,
+     * pegando sempre o mais recente (updated_at).
+     */
+    public function scopeDeduplicated($query)
+    {
+        return $query->selectRaw('DISTINCT ON (city_id, disease_type, epi_week, year) *')
+            ->orderBy('city_id')
+            ->orderBy('disease_type')
+            ->orderBy('epi_week')
+            ->orderBy('year')
+            ->orderBy('updated_at', 'desc');
+    }
 }
