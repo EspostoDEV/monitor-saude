@@ -21,6 +21,18 @@ class EpidemicRecord extends Model
         'status',
     ];
 
+    protected $appends = ['status_label'];
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match($this->level) {
+            4 => 'Crítico',
+            3 => 'Alerta',
+            2 => 'Amarelo',
+            default => 'Estável',
+        };
+    }
+
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);

@@ -12,6 +12,12 @@ use Illuminate\Support\Carbon;
 class HealthDataService
 {
     protected string $baseUrl = 'https://info.dengue.mat.br/api/alert/';
+    protected RiskEngineService $riskService;
+
+    public function __construct(RiskEngineService $riskService)
+    {
+        $this->riskService = $riskService;
+    }
 
     /**
      * Sincroniza dados de uma doença para um município específico ou todos.
@@ -170,7 +176,11 @@ class HealthDataService
                 ],
                 [
                     'cases' => $record['casos'] ?? 0,
-                    'level' => $record['nivel'] ?? 1,
+                    'level' => $this->riskService->getAlertLevel(
+                        $record['incidencia'] ?? 0,
+                        $record['casos'] ?? 0,
+                        'stable' // Tendência não disponível no momento do sync unitário
+                    ),
                     'incidence' => $record['incidencia'] ?? 0,
                     're_inferior' => $record['re_inf'] ?? null,
                     're_superior' => $record['re_sup'] ?? null,

@@ -10,25 +10,46 @@ class RiskEngineService
     public function getAlertLevel(float $incidence, int $cases, string $trend): int
     {
         $level = 1;
+        $thresholds = config('epidemiology.thresholds', [
+            'yellow' => 100,
+            'orange' => 300,
+            'red'    => 600,
+        ]);
+        
+        $sanity = config('epidemiology.sanity_check', [
+            'min_cases_for_stable' => 5,
+            'min_cases_for_critical' => 10,
+        ]);
 
-        if ($incidence > 600) {
+        if ($incidence >= $thresholds['red']) {
             $level = 4;
-        } elseif ($incidence > 300) {
+        } elseif ($incidence >= $thresholds['orange']) {
             $level = 3;
-        } elseif ($incidence > 100) {
+        } elseif ($incidence >= $thresholds['yellow']) {
             $level = 2;
         }
 
         // Sanity Check: Cidades pequenas com pouquíssimos casos absolutos (Issue 8)
-        // Se houver menos de 5 casos totais, mantemos nível 1 para evitar ruído estatístico.
-        // Se houver entre 5 e 10 casos e o nível for Crítico, rebaixamos para Alerta.
-        if ($cases < 5) {
+        if ($cases < $sanity['min_cases_for_stable']) {
             $level = 1;
-        } elseif ($cases < 10 && $level === 4) {
+        } elseif ($cases < $sanity['min_cases_for_critical'] && $level === 4) {
             $level = 3;
         }
 
         return $level;
+    }
+
+    /**
+     * Returns the human-readable label for a given alert level.
+     */
+    public function getAlertStatusLabel(int $level): string
+    {
+        return match ($level) {
+            4 => 'Crítico',
+            3 => 'Alerta',
+            2 => 'Amarelo',
+            default => 'Estável',
+        };
     }
 
     /**

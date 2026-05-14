@@ -68,10 +68,7 @@ class EpidemicController extends Controller
 
                 foreach ($data as $record) {
                     $record->trend = $this->trendService->calculateTrend($record->city, $disease);
-                    $record->level = $this->riskService->getAlertLevel($record->incidence, $record->cases, $record->trend);
-                    $record->status = match($record->level) {
-                        4 => 'Crítico', 3 => 'Alerta', 2 => 'Amarelo', default => 'Estável'
-                    };
+                    $record->status = $record->status_label;
                 }
 
                 return [
@@ -107,7 +104,7 @@ class EpidemicController extends Controller
                             'new_cases' => (int) $item->new_cases,
                             'incidence' => round($item->incidence, 2),
                             'level' => $level,
-                            'status' => match($level) { 4 => 'Crítico', 3 => 'Alerta', 2 => 'Amarelo', default => 'Estável' },
+                            'status' => $this->riskService->getAlertStatusLabel($level),
                             'is_state' => true,
                             'trend' => $trend,
                         ];
