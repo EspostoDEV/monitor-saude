@@ -60,7 +60,7 @@ class HealthDataService
                 foreach ($chunk as $city) {
                     $response = $responses[$city->ibge_code] ?? null;
                     
-                    if ($response && $response->successful()) {
+                    if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
                         $data = $response->json();
                         if ($data) {
                             $processed = $this->persistData($city, $disease, $data);
@@ -68,7 +68,14 @@ class HealthDataService
                         }
                     } else {
                         // Log de erro específico por cidade (Issue 6)
-                        Log::warning("Falha ao sincronizar cidade {$city->name} ({$city->ibge_code}): " . ($response ? $response->status() : 'No response'));
+                        $errorMsg = 'No response';
+                        if ($response instanceof \Illuminate\Http\Client\Response) {
+                            $errorMsg = "HTTP " . $response->status();
+                        } elseif ($response instanceof \Throwable) {
+                            $errorMsg = "Exception: " . $response->getMessage();
+                        }
+                        
+                        Log::warning("Falha ao sincronizar cidade {$city->name} ({$city->ibge_code}): " . $errorMsg);
                     }
                 }
 
