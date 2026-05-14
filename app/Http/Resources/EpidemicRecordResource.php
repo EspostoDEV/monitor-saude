@@ -8,18 +8,27 @@ use Carbon\Carbon;
 
 class EpidemicRecordResource extends JsonResource
 {
+    private static array $weekRangeCache = [];
+    private static array $monthCache = [];
+
     public function toArray(Request $request): array
     {
-        // Calcula a data de início da semana epidemiológica
-        $date = Carbon::now()->setISODate($this->year, $this->epi_week);
-        $startDate = $date->startOfWeek(Carbon::SUNDAY)->format('d/m');
-        $endDate = $date->endOfWeek(Carbon::SATURDAY)->format('d/m');
-        
-        $monthNames = [
-            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 
-            5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 
-            9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
-        ];
+        $cacheKey = "{$this->year}_{$this->epi_week}";
+
+        if (!isset(self::$weekRangeCache[$cacheKey])) {
+            $date = Carbon::now()->setISODate($this->year, $this->epi_week);
+            $startDate = $date->startOfWeek(Carbon::SUNDAY)->format('d/m');
+            $endDate = $date->endOfWeek(Carbon::SATURDAY)->format('d/m');
+            
+            $monthNames = [
+                1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 
+                5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 
+                9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
+            ];
+
+            self::$weekRangeCache[$cacheKey] = "$startDate a $endDate";
+            self::$monthCache[$cacheKey] = $monthNames[$date->month];
+        }
 
         return [
             'id' => $this->id,
@@ -29,8 +38,8 @@ class EpidemicRecordResource extends JsonResource
             'incidence' => $this->incidence,
             'population' => $this->population,
             'week' => $this->epi_week,
-            'week_range' => "$startDate a $endDate",
-            'month' => $monthNames[$date->month],
+            'week_range' => self::$weekRangeCache[$cacheKey],
+            'month' => self::$monthCache[$cacheKey],
             'year' => $this->year,
             'status' => $this->status,
             'city_id' => $this->city_id,
