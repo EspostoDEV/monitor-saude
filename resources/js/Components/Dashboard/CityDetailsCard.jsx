@@ -22,11 +22,17 @@ export default function CityDetailsCard({
         <div className="absolute inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-sm">
             <div className="max-w-4xl w-full bg-slate-900/95 backdrop-blur-2xl p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden flex flex-col max-h-full animate-in zoom-in-95 duration-300">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]" />
-                <button onClick={() => setSelectedRecord(null)} className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors z-50">
-                    <X size={20} className="text-slate-500" />
+                
+                {/* Botão de fechar dentro do modal, mas posicionado com folga */}
+                <button 
+                    onClick={() => setSelectedRecord(null)} 
+                    className="absolute top-5 right-5 p-2 hover:bg-white/5 rounded-full transition-all z-50 group"
+                    aria-label="Fechar detalhes"
+                >
+                    <X size={20} className="text-slate-500 group-hover:text-white transition-colors" />
                 </button>
 
-                <div className="flex gap-8 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="flex gap-8 overflow-y-auto pr-2 custom-scrollbar pt-6">
                     <div className="flex-none w-80">
                         <h3 className="text-4xl font-black tracking-tighter text-white mb-2">
                             {selectedRecord.city?.name || (STATE_NAMES[selectedRecord.uf] || selectedRecord.uf)}
