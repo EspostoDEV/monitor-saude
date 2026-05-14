@@ -33,6 +33,10 @@ class TrendAnalysisService
      */
     public function calculateTrendForUf(string $uf, string $disease): string
     {
+        $totalCitiesInUf = City::where('uf', $uf)->count();
+        
+        if ($totalCitiesInUf === 0) return 'stable';
+
         $deduplicatedSubquery = EpidemicRecord::query()
             ->selectRaw('DISTINCT ON (city_id, year, epi_week) *')
             ->where('disease_type', $disease)
@@ -40,6 +44,30 @@ class TrendAnalysisService
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')
             ->orderBy('updated_at', 'desc');
+
+        // Captura o número de cidades que contribuíram para a semana mais recente
+        $latestRecord = EpidemicRecord::where('disease_type', $disease)
+            ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
+            ->where('cities.uf', $uf)
+            ->orderBy('year', 'desc')
+            ->orderBy('epi_week', 'desc')
+            ->first();
+
+        if ($latestRecord) {
+            $syncedCitiesCount = EpidemicRecord::where('disease_type', $disease)
+                ->where('year', $latestRecord->year)
+                ->where('epi_week', $latestRecord->epi_week)
+                ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
+                ->where('cities.uf', $uf)
+                ->count('city_id');
+
+            $coverage = $syncedCitiesCount / $totalCitiesInUf;
+
+            // Se menos de 90% das cidades sincronizaram, a tendência é incerta (Quórum do Winston)
+            if ($coverage < 0.9) {
+                return 'uncertain';
+            }
+        }
 
         $records = \DB::table(\DB::raw("({$deduplicatedSubquery->toSql()}) as records"))
             ->mergeBindings($deduplicatedSubquery->getQuery())

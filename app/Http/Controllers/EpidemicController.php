@@ -70,32 +70,26 @@ class EpidemicController extends Controller
                         2 => 'Amarelo',
                         default => 'Estável'
                     };
-                    $record->alert_explanation = $this->riskService->getAlertExplanation($record->level, $record->incidence, $record->cases);
-                    $record->trend_explanation = $this->riskService->getTrendExplanation($record->trend, $record->incidence);
                 }
                 
                 // Resolvemos o Resource para Array antes de salvar no Cache para evitar erro de serialização
                 return EpidemicRecordResource::collection($records)->resolve();
             });
         } else {
-            // Visão Nacional - Cache por UF
+            // Visão Nacional - Via Materialized View (Performance e Precisão)
             $cacheKey = "epi_intel_national_{$year}_{$disease}";
             $records = \Cache::remember($cacheKey, 600, function() use ($year, $disease) {
-                // Otimização: Pegamos a semana máxima antes da query principal
-                $maxWeek = EpidemicRecord::where('year', $year)->where('disease_type', $disease)->max('epi_week');
-
-                return EpidemicRecord::query()
-                    ->select('cities.uf')
-                    ->selectRaw('SUM(cases) as total_cases')
-                    ->selectRaw('SUM(CASE WHEN epi_week = ? THEN cases ELSE 0 END) as new_cases', [$maxWeek])
-                    // Correção Matemática: Incidência real (Soma casos / Soma pop * 100k)
-                    // Como não temos a população agregada por UF fácil aqui, vamos manter o AVG por enquanto, 
-                    // mas marcar para uma View Materializada no futuro se precisarmos de precisão científica total.
-                    ->selectRaw('AVG(incidence) as incidence') 
-                    ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
+                $maxWeek = \DB::table('mv_uf_epidemic_stats')
                     ->where('year', $year)
                     ->where('disease_type', $disease)
-                    ->groupBy('cities.uf')
+                    ->max('epi_week');
+
+                return \DB::table('mv_uf_epidemic_stats')
+                    ->select('uf', 'total_cases', 'real_incidence as incidence')
+                    ->selectRaw('total_cases as new_cases') // Para a visão nacional simplificada
+                    ->where('year', $year)
+                    ->where('epi_week', $maxWeek)
+                    ->where('disease_type', $disease)
                     ->get()
                     ->map(function($item) use ($disease) {
                         $trend = $this->trendService->calculateTrendForUf($item->uf, $disease);
@@ -117,8 +111,6 @@ class EpidemicController extends Controller
                             'status' => $status,
                             'is_state' => true,
                             'trend' => $trend,
-                            'alert_explanation' => $this->riskService->getAlertExplanation($level, $item->incidence, (int)$item->new_cases),
-                            'trend_explanation' => $this->riskService->getTrendExplanation($trend, $item->incidence),
                         ];
                     })->values()->all();
             });
@@ -154,6 +146,14 @@ class EpidemicController extends Controller
             ->get()
             ->reverse()
             ->values();
+
+        // Lazy Loading: Calcula as explicações apenas para o registro mais recente do histórico
+        $latest = $history->last(); // Após reverse e values, o último é o mais recente
+        if ($latest) {
+            $latest->trend = $this->trendService->calculateTrend($latest->city, $disease);
+            $latest->alert_explanation = $this->riskService->getAlertExplanation($latest->level, $latest->incidence, $latest->cases);
+            $latest->trend_explanation = $this->riskService->getTrendExplanation($latest->trend, $latest->incidence);
+        }
 
         return response()->json(EpidemicRecordResource::collection($history));
     }

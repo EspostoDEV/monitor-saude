@@ -52,8 +52,8 @@ class EpidemicRecordResource extends JsonResource
                 'lng' => $this->lng,
             ],
             'trend' => $this->trend ?? 'stable',
-            'alert_explanation' => $this->alert_explanation ?? null,
-            'trend_explanation' => $this->trend_explanation ?? null,
+            'alert_explanation' => $this->when(isset($this->alert_explanation), $this->alert_explanation),
+            'trend_explanation' => $this->when(isset($this->trend_explanation), $this->trend_explanation),
         ];
     }
 }

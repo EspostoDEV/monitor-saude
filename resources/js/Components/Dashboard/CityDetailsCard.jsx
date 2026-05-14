@@ -18,6 +18,11 @@ export default function CityDetailsCard({
 }) {
     if (!selectedRecord) return null;
 
+    // Busca os detalhes enriquecidos que vieram pelo Lazy Loading do histórico
+    const enrichedData = history && history.length > 0 ? history[history.length - 1] : null;
+    const alertExplanation = selectedRecord.alert_explanation || enrichedData?.alert_explanation;
+    const trendExplanation = selectedRecord.trend_explanation || enrichedData?.trend_explanation;
+
     return (
         <div className="absolute inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-sm">
             <div className="max-w-4xl w-full bg-slate-900/95 backdrop-blur-2xl p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden flex flex-col max-h-full animate-in zoom-in-95 duration-300">
@@ -75,16 +80,16 @@ export default function CityDetailsCard({
                                     <span className="text-[9px] text-slate-400">1 em cada {Math.round(100000 / selectedRecord.incidence).toLocaleString()} pessoas</span>
                                 </div>
                                 <div className="space-y-3">
-                                    {selectedRecord.alert_explanation && (
+                                    {alertExplanation && (
                                         <div className="bg-white/5 p-3 rounded-xl border border-white/5 flex gap-3">
                                             <ShieldAlert size={14} className={selectedRecord.level >= 3 ? 'text-orange-400' : 'text-emerald-400'} />
-                                            <p className="text-[11px] text-slate-300 leading-relaxed">{selectedRecord.alert_explanation}</p>
+                                            <p className="text-[11px] text-slate-300 leading-relaxed">{alertExplanation}</p>
                                         </div>
                                     )}
-                                    {selectedRecord.trend_explanation && (
+                                    {trendExplanation && (
                                         <div className="bg-white/5 p-3 rounded-xl border border-white/5 flex gap-3">
                                             <TrendingUp size={14} className={selectedRecord.trend === 'up' ? 'text-red-400' : 'text-emerald-400'} />
-                                            <p className="text-[11px] text-slate-300 leading-relaxed">{selectedRecord.trend_explanation}</p>
+                                            <p className="text-[11px] text-slate-300 leading-relaxed">{trendExplanation}</p>
                                         </div>
                                     )}
                                 </div>

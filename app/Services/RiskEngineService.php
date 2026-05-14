@@ -54,6 +54,7 @@ class RiskEngineService
         return match ($trend) {
             'up' => "Tendência de Alta: A média móvel de casos cresceu mais de 15% nas últimas 3 semanas, indicando aceleração do surto.",
             'down' => "Tendência de Queda: Redução significativa na velocidade de contágio. A curva está em declínio.",
+            'uncertain' => "Dados em Consolidação: Menos de 90% dos municípios da região reportaram dados para a última semana. A tendência atual pode ser imprecisa até a conclusão do quórum.",
             default => "Estabilidade: O número de novos casos mantém-se constante, sem sinais de aceleração ou recuo imediato.",
         };
     }
