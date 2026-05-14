@@ -79,7 +79,11 @@ export default function Dashboard({ records, filters, stats }) {
                     setHistory(res.data);
                     setLoadingHistory(false);
                 })
-                .catch(() => setLoadingHistory(false));
+                .catch(err => {
+                    console.error("Falha ao buscar histórico:", err);
+                    setHistory([]); // Limpa para evitar dados stale
+                    setLoadingHistory(false);
+                });
         }
     }, [selectedRecord]);
 

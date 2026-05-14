@@ -22,22 +22,24 @@ export default function ControlHeader({ filters, handleBack, stats }) {
                 </div>
             </div>
             
-            <div className="bg-slate-900/40 px-6 py-3 rounded-2xl border border-white/5 backdrop-blur-xl flex items-center gap-8 shadow-2xl">
-                <div className="flex items-center gap-3 border-r border-white/10 pr-8">
-                    <TrendingUp className="text-emerald-400" size={20} />
+            <div className="bg-slate-900/40 px-6 py-3 rounded-2xl border border-white/5 backdrop-blur-xl flex items-center gap-8 shadow-2xl" role="region" aria-label="Estatísticas Globais">
+                <div className="flex items-center gap-3 border-r border-white/10 pr-8" aria-label={`Total de casos: ${stats?.total_cases || 0}`}>
+                    <TrendingUp className="text-emerald-400" size={20} aria-hidden="true" />
                     <div>
                         <span className="text-[9px] text-slate-500 uppercase font-black tracking-[0.2em] block">Casos Totais</span>
                         <span className="text-xl font-mono font-bold text-white">{(stats?.total_cases || 0).toLocaleString()}</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Calendar className="text-slate-500" size={18} />
+                <div className="flex items-center gap-3" aria-label={`Semana epidemiológica ${stats?.latest_week}`}>
+                    <Calendar className="text-slate-500" size={18} aria-hidden="true" />
                     <div className="flex flex-col">
                         <span className="text-sm font-medium text-slate-300">2026 • Dengue • Sem #{stats?.latest_week}</span>
-                        {stats?.last_sync && (
+                        {stats?.last_sync ? (
                             <span className="text-[10px] text-slate-500 font-medium italic">
                                 Sincronizado: {new Date(stats.last_sync).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </span>
+                        ) : (
+                            <span className="text-[10px] text-slate-400 font-medium italic">Aguardando sincronização...</span>
                         )}
                     </div>
                 </div>

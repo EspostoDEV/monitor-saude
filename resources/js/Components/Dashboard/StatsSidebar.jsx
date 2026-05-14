@@ -29,11 +29,13 @@ export default function StatsSidebar({
                 />
             </div>
             
-            <div className="space-y-3 overflow-y-auto flex-1 pr-3 custom-scrollbar">
+            <div className="space-y-3 overflow-y-auto flex-1 pr-3 custom-scrollbar" role="list" aria-label="Ranking de risco">
                 {sortedDataList.map((item) => (
                     <div 
                         key={isStateView ? item.uf : item.id} 
                         onClick={() => isStateView ? handleStateClick(item.uf) : setSelectedRecord(item)}
+                        role="listitem"
+                        aria-label={`${isStateView ? STATE_NAMES[item.uf] : item.city?.name}, Nível ${item.level}, ${item.new_cases || item.cases || 0} casos`}
                         className="p-4 rounded-2xl border border-white/5 bg-slate-800/30 hover:bg-slate-800/50 transition-all cursor-pointer flex justify-between items-center group"
                     >
                         <div className="min-w-0">
@@ -45,11 +47,11 @@ export default function StatsSidebar({
                                     <span className="text-[8px] text-slate-500 uppercase font-black">Novos</span>
                                     <span className="text-[10px] text-orange-400 font-bold">{(item.new_cases || item.cases || 0).toLocaleString()}</span>
                                 </div>
-                                <div className="w-px h-3 bg-white/10" />
+                                <div className="w-px h-3 bg-white/10" aria-hidden="true" />
                                 <div className="flex items-center gap-1">
-                                    {item.trend === 'up' ? <TrendingUp size={12} className="text-red-500" /> : 
-                                     item.trend === 'down' ? <TrendingDown size={12} className="text-emerald-500" /> : 
-                                     <div className="w-2 h-0.5 bg-slate-600 rounded-full" />}
+                                    {item.trend === 'up' ? <TrendingUp size={12} className="text-red-500" aria-label="Tendência de alta" /> : 
+                                     item.trend === 'down' ? <TrendingDown size={12} className="text-emerald-500" aria-label="Tendência de queda" /> : 
+                                     <div className="w-2 h-0.5 bg-slate-600 rounded-full" aria-label="Tendência estável" />}
                                 </div>
                             </div>
                         </div>
@@ -58,7 +60,7 @@ export default function StatsSidebar({
                             item.level === 3 ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20' :
                             item.level === 2 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
                             'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                        }`}>L{item.level}</div>
+                        }`} aria-label={`Nível de alerta ${item.level}`}>L{item.level}</div>
                     </div>
                 ))}
             </div>

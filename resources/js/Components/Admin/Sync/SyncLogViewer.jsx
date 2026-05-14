@@ -17,17 +17,25 @@ export default function SyncLogViewer({
                 <div className="flex items-center gap-6">
                     <div className="text-right">
                         <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Progresso</div>
-                        <div className="text-lg font-mono text-blue-400 font-bold">{progress}%</div>
+                        <div className="text-lg font-mono text-blue-400 font-bold" aria-live="polite">
+                            {Math.round(Math.min(Math.max(progress, 0), 100))}%
+                        </div>
                     </div>
-                    {isSyncing && <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />}
+                    {isSyncing && <Loader2 className="w-6 h-6 text-blue-500 animate-spin" aria-label="Processando..." />}
                 </div>
             </div>
 
             <div className="p-0">
-                <div className="h-1.5 bg-gray-900 overflow-hidden">
+                <div 
+                    className="h-1.5 bg-gray-900 overflow-hidden" 
+                    role="progressbar" 
+                    aria-valuenow={progress} 
+                    aria-valuemin="0" 
+                    aria-valuemax="100"
+                >
                     <div 
                         className="h-full bg-blue-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(59,130,246,0.5)]"
-                        style={{ width: `${progress}%` }}
+                        style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
                     />
                 </div>
                 
