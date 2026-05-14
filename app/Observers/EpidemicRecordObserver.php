@@ -15,17 +15,21 @@ class EpidemicRecordObserver
     }
 
     /**
-     * Handle the EpidemicRecord "updated" event.
+     * Handle the EpidemicRecord "updating" event.
      */
-    public function updated(EpidemicRecord $epidemicRecord): void
+    public function updating(EpidemicRecord $epidemicRecord): void
     {
-        if ($epidemicRecord->wasChanged('cases')) {
-            \App\Models\EpidemicRecordAudit::create([
-                'epidemic_record_id' => $epidemicRecord->id,
-                'old_cases' => $epidemicRecord->getOriginal('cases'),
-                'new_cases' => $epidemicRecord->cases,
-                'reason' => 'Sync/API Correction',
-            ]);
+        if ($epidemicRecord->isDirty('cases') && $epidemicRecord->getOriginal('cases') !== null) {
+            try {
+                \App\Models\EpidemicRecordAudit::create([
+                    'epidemic_record_id' => $epidemicRecord->id,
+                    'old_cases' => $epidemicRecord->getOriginal('cases'),
+                    'new_cases' => $epidemicRecord->cases,
+                    'reason' => 'Sync/API Correction',
+                ]);
+            } catch (\Exception $e) {
+                \Log::error("Falha ao gravar auditoria epidemiológica: " . $e->getMessage());
+            }
         }
     }
 

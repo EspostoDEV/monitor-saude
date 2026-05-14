@@ -55,10 +55,18 @@ export default function CityDetailsCard({
                             </span>
                             <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
                                 selectedRecord.trend === 'up' ? 'text-red-400 bg-red-400/10 border-red-400/20' :
-                                selectedRecord.trend === 'down' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-slate-400 bg-slate-400/10 border-slate-400/20'
+                                selectedRecord.trend === 'down' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 
+                                selectedRecord.trend === 'uncertain' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
+                                'text-slate-400 bg-slate-400/10 border-slate-400/20'
                             }`}>
-                                {selectedRecord.trend === 'up' ? <TrendingUp size={10} /> : selectedRecord.trend === 'down' ? <TrendingDown size={10} /> : <Clock size={10} />}
-                                {selectedRecord.trend === 'up' ? 'Alta' : selectedRecord.trend === 'down' ? 'Queda' : 'Estável'}
+                                {selectedRecord.trend === 'up' ? <TrendingUp size={10} /> : 
+                                 selectedRecord.trend === 'down' ? <TrendingDown size={10} /> : 
+                                 selectedRecord.trend === 'uncertain' ? <Activity size={10} /> :
+                                 <Clock size={10} />}
+                                {selectedRecord.trend === 'up' ? 'Alta' : 
+                                 selectedRecord.trend === 'down' ? 'Queda' : 
+                                 selectedRecord.trend === 'uncertain' ? 'Consolidando...' :
+                                 'Estável'}
                             </span>
                         </div>
 

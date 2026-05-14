@@ -62,7 +62,7 @@ class HealthDataService
                     
                     if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
                         $data = $response->json();
-                        if ($data) {
+                        if ($data && is_array($data)) {
                             $processed = $this->persistData($city, $disease, $data);
                             $count += $processed;
                         }
@@ -131,11 +131,25 @@ class HealthDataService
             // Verifica se é o encerramento total da sessão
             if ($session->processed_cities >= $session->total_cities && $session->status !== 'finished') {
                 $session->update(['status' => 'finished', 'completed_at' => now()]);
+                
+                // Automação Roadmap 2.2: Atualiza a View Materializada e limpa cache de inteligência
+                try {
+                    \Illuminate\Support\Facades\Artisan::call('app:refresh-stats-view');
+                    
+                    // Limpa chaves globais de inteligência (visão nacional)
+                    $currentYear = now()->year;
+                    \Illuminate\Support\Facades\Cache::forget("epi_intel_national_{$currentYear}_{$disease}");
+                    \Illuminate\Support\Facades\Cache::forget("epi_intel_national_" . ($currentYear - 1) . "_{$disease}");
+                    
+                } catch (\Exception $e) {
+                    \Log::error("Falha na automação pós-sync: " . $e->getMessage());
+                }
+
                 \App\Models\SyncLog::create([
                     'session_id' => $sessionId,
                     'disease' => $disease,
                     'level' => 'success',
-                    'message' => "🏁 Sincronização de {$disease} CONCLUÍDA! Total: {$session->processed_cities} municípios."
+                    'message' => "🏁 Sincronização de {$disease} CONCLUÍDA! View Materializada e Cache atualizados."
                 ]);
             }
         }

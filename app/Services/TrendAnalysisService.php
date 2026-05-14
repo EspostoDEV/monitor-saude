@@ -61,12 +61,13 @@ class TrendAnalysisService
                 ->where('cities.uf', $uf)
                 ->count('city_id');
 
-            $coverage = $syncedCitiesCount / $totalCitiesInUf;
-
             // Se menos de 90% das cidades sincronizaram, a tendência é incerta (Quórum do Winston)
-            if ($coverage < 0.9) {
+            if ($totalCitiesInUf > 0 && ($syncedCitiesCount / $totalCitiesInUf) < 0.9) {
                 return 'uncertain';
             }
+        } else {
+            // Se não há nenhum registro para essa UF/Doença, a tendência é incerta
+            return 'uncertain';
         }
 
         $records = \DB::table(\DB::raw("({$deduplicatedSubquery->toSql()}) as records"))
