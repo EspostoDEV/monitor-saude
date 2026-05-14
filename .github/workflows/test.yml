@@ -11,8 +11,8 @@ on:
   pull_request:
     branches: [main, develop]
   schedule:
-    # Weekly burn-in on Sundays at 2 AM UTC
-    - cron: "0 2 * * 0"
+    # Daily burn-in at 2 AM UTC to catch flakiness early
+    - cron: "0 2 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,7 +31,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
           coverage: none
 
@@ -71,7 +71,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
           coverage: none
 
@@ -92,7 +92,7 @@ jobs:
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: database/database.sqlite
-        run: php artisan test --parallel --recreate-databases
+        run: php artisan test --parallel --recreate-databases --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload logs on failure
         if: failure()
@@ -100,7 +100,7 @@ jobs:
         with:
           name: laravel-logs-${{ matrix.shard }}
           path: storage/logs/
-          retention-days: 7
+          retention-days: 30
 
   # Burn-in stage - Flaky test detection (Feature tests)
   burn-in:
@@ -117,7 +117,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
           coverage: none
 
@@ -156,7 +156,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Burn-in Status**: ${{ needs.burn-in.result || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **PHP Version**: 8.3" >> $GITHUB_STEP_SUMMARY
+          echo "- **PHP Version**: 8.4" >> $GITHUB_STEP_SUMMARY
           echo "- **Shards**: 2" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
