@@ -14,14 +14,12 @@ class TrendAnalysisService
      */
     public function calculateTrend(City $city, string $disease): string
     {
-        // Buscamos um pouco mais de dados para garantir que teremos semanas distintas após o DISTINCT
         $records = EpidemicRecord::query()
-            ->selectRaw('DISTINCT ON (year, epi_week) *')
+            ->deduplicated(['year', 'epi_week'])
             ->where('city_id', $city->id)
             ->where('disease_type', $disease)
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')
-            ->orderBy('updated_at', 'desc')
             ->limit(12) // Aumentamos o limite para garantir 8 semanas úteis
             ->get();
 
@@ -40,12 +38,8 @@ class TrendAnalysisService
         }
 
         $deduplicatedSubquery = EpidemicRecord::query()
-            ->selectRaw('DISTINCT ON (city_id, year, epi_week) *')
-            ->where('disease_type', $disease)
-            ->orderBy('city_id')
-            ->orderBy('year', 'desc')
-            ->orderBy('epi_week', 'desc')
-            ->orderBy('updated_at', 'desc');
+            ->deduplicated(['city_id', 'year', 'epi_week'])
+            ->where('disease_type', $disease);
 
         // Captura o número de cidades que contribuíram para a semana mais recente
         $latestRecord = EpidemicRecord::where('disease_type', $disease)

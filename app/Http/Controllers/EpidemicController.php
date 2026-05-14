@@ -49,9 +49,8 @@ class EpidemicController extends Controller
                     ->where('disease_type', $disease)
                     ->groupBy('city_id');
 
-                $data = EpidemicRecord::query()
-                    ->selectRaw('DISTINCT ON (epidemic_records.city_id) epidemic_records.*')
-                    ->selectRaw('ST_X(cities.location::geometry) as lng, ST_Y(cities.location::geometry) as lat')
+                $query = EpidemicRecord::query()
+                    ->deduplicated(['epidemic_records.city_id'])
                     ->selectRaw('COALESCE(totals.total_cases, 0) as total_cases')
                     // Injeção de Stats Globais da UF via Subqueries para evitar Queries N+1
                     ->selectRaw('(SELECT SUM(cases) FROM epidemic_records e2 JOIN cities c2 ON c2.id = e2.city_id WHERE c2.uf = ? AND e2.year = ? AND e2.disease_type = ?) as uf_total_cases', [$uf, $year, $disease])
@@ -61,11 +60,16 @@ class EpidemicController extends Controller
                     ->with('city')
                     ->where('cities.uf', $uf)
                     ->where('year', $year)
-                    ->where('disease_type', $disease)
-                    ->orderBy('epidemic_records.city_id')
-                    ->orderBy('year', 'desc')
-                    ->orderBy('epi_week', 'desc')
-                    ->get();
+                    ->where('disease_type', $disease);
+
+                if (\DB::getDriverName() === 'pgsql') {
+                    $query->selectRaw('ST_X(cities.location::geometry) as lng, ST_Y(cities.location::geometry) as lat');
+                } else {
+                    // Fallback para SQLite/Ambiente de testes (Simula coordenadas nulas ou parseia o texto se necessário)
+                    $query->selectRaw('NULL as lng, NULL as lat');
+                }
+
+                $data = $query->get();
 
                 foreach ($data as $record) {
                     $record->trend = $this->trendService->calculateTrend($record->city, $disease);
