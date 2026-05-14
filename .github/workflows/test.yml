@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Lint stage - Code quality checks
+  # Lint stage - Code quality checks and Asset Build
   lint:
     name: Lint & Build
     runs-on: ubuntu-latest
@@ -53,6 +53,13 @@ jobs:
       - name: Run Vite Build
         run: npm run build
 
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vite-build
+          path: public/build/
+          retention-days: 1
+
   # Test stage - Parallel execution with sharding
   test:
     name: PHPUnit (Shard ${{ matrix.shard }})
@@ -63,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2] # Adjusted for smaller project, can be increased
+        shard: [1, 2]
 
     services:
       postgres:
@@ -92,6 +99,12 @@ jobs:
 
       - name: Install PHP dependencies
         run: composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vite-build
+          path: public/build/
 
       - name: Prepare Laravel Application
         run: |
@@ -122,7 +135,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: test
-    # Only run burn-in on PRs or schedule to avoid redundant local runs
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'
 
     services:
@@ -152,6 +164,12 @@ jobs:
 
       - name: Install PHP dependencies
         run: composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vite-build
+          path: public/build/
 
       - name: Prepare Laravel Application
         run: |
