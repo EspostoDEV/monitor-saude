@@ -19,6 +19,15 @@ const STATE_COORDS = {
     'SP': [-23.5505, -46.6333], 'SE': [-10.9111, -37.0717], 'TO': [-10.1753, -48.3317]
 };
 
+const STATE_NAMES = {
+    'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas', 'BA': 'Bahia', 'CE': 'Ceará',
+    'DF': 'Distrito Federal', 'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão', 'MT': 'Mato Grosso',
+    'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais', 'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná',
+    'PE': 'Pernambuco', 'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte',
+    'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima', 'SC': 'Santa Catarina',
+    'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
+};
+
 function ChangeView({ center, zoom }) {
     const map = useMap();
     useEffect(() => {
@@ -36,11 +45,14 @@ export default function Dashboard({ records, filters, stats }) {
     const [geoData, setGeoData] = useState(null);
     const [geoError, setGeoError] = useState(null);
     const [isPageLoading, setIsPageLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const timer = setTimeout(() => setIsPageLoading(false), 300);
-        return () => clearTimeout(timer);
-    }, []);
+        if (geoData || geoError) {
+            const timer = setTimeout(() => setIsPageLoading(false), 200);
+            return () => clearTimeout(timer);
+        }
+    }, [geoData, geoError]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -76,24 +88,40 @@ export default function Dashboard({ records, filters, stats }) {
 
     const handleStateClick = useCallback((uf) => {
         setSelectedRecord(null);
+        setSearchTerm('');
         router.get('/', { ...filters, uf }, { preserveState: true });
     }, [filters]);
 
     const handleBack = useCallback(() => {
         setSelectedRecord(null);
+        setSearchTerm('');
         router.get('/', { ...filters, uf: null }, { preserveState: true });
     }, [filters]);
 
     const dataList = useMemo(() => {
         if (!records) return [];
-        
-        // Normalização: lida com Array, Objeto com .data ou Objeto puro (PHP associative array)
         if (Array.isArray(records)) return records;
         if (records.data && Array.isArray(records.data)) return records.data;
-        
-        // Se for um objeto (provavelmente vindo de um cache serializado), converte os valores para array
         return Object.values(records).filter(item => item && typeof item === 'object');
     }, [records]);
+
+    const filteredDataList = useMemo(() => {
+        if (!searchTerm) return dataList;
+        const term = searchTerm.toLowerCase();
+        return dataList.filter(item => {
+            if (isStateView) {
+                const uf = item.uf || '';
+                const fullName = STATE_NAMES[uf] || '';
+                return uf.toLowerCase().includes(term) || fullName.toLowerCase().includes(term);
+            }
+            const cityName = item.city?.name || '';
+            return cityName.toLowerCase().includes(term);
+        });
+    }, [dataList, searchTerm, isStateView]);
+
+    const sortedDataList = useMemo(() => {
+        return [...filteredDataList].sort((a, b) => (b.total_cases || b.cases || 0) - (a.total_cases || a.cases || 0));
+    }, [filteredDataList]);
     
     const stateDataMap = useMemo(() => {
         if (!isStateView || !Array.isArray(dataList)) return {};
@@ -173,7 +201,12 @@ export default function Dashboard({ records, filters, stats }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <Calendar className="text-slate-500" size={18} />
-                        <span className="text-sm font-medium text-slate-300">2026 • Dengue • Sem #{stats?.latest_week}</span>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-300">2026 • Dengue • Sem #{stats?.latest_week}</span>
+                            {stats?.last_sync && (
+                                <span className="text-[10px] text-slate-500 font-medium">Sincronizado: {new Date(stats.last_sync).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -218,7 +251,9 @@ export default function Dashboard({ records, filters, stats }) {
 
                                     <div className="flex gap-8 overflow-y-auto pr-2 custom-scrollbar">
                                         <div className="flex-none w-80">
-                                            <h3 className="text-4xl font-black tracking-tighter text-white mb-2">{selectedRecord.city?.name || selectedRecord.uf}</h3>
+                                            <h3 className="text-4xl font-black tracking-tighter text-white mb-2">
+                                                {selectedRecord.city?.name || (STATE_NAMES[selectedRecord.uf] || selectedRecord.uf)}
+                                            </h3>
                                             
                                             <div className="flex flex-wrap gap-2 mb-6">
                                                 <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
@@ -323,18 +358,30 @@ export default function Dashboard({ records, filters, stats }) {
                 </div>
 
                 <div className="bg-slate-900/50 rounded-[2rem] border border-white/5 p-8 shadow-3xl flex flex-col h-full backdrop-blur-sm overflow-hidden">
-                    <h2 className="text-xl font-black tracking-tight flex items-center gap-3 mb-8 shrink-0">
+                    <h2 className="text-xl font-black tracking-tight flex items-center gap-3 mb-6 shrink-0">
                         <div className="w-1.5 h-6 bg-emerald-400 rounded-full"></div>
                         {isStateView ? 'Ranking Nacional' : `Municípios (${filters.uf})`}
                     </h2>
+
+                    <div className="relative mb-6 shrink-0">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder={isStateView ? "Buscar estado..." : "Buscar município..."}
+                            className="w-full bg-slate-950/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    
                     <div className="space-y-3 overflow-y-auto flex-1 pr-3 custom-scrollbar">
-                        {[...dataList].sort((a, b) => (b.total_cases || b.cases || 0) - (a.total_cases || a.cases || 0)).map((item) => (
+                        {sortedDataList.map((item) => (
                             <div key={isStateView ? item.uf : item.id} onClick={() => isStateView ? handleStateClick(item.uf) : setSelectedRecord(item)}
                                 className="p-4 rounded-2xl border border-white/5 bg-slate-800/30 hover:bg-slate-800/50 transition-all cursor-pointer flex justify-between items-center group"
                             >
                                 <div className="min-w-0">
                                     <h3 className="font-bold text-slate-200 truncate group-hover:text-emerald-400 transition-colors">
-                                        {isStateView ? `Estado: ${item.uf}` : (item.city?.name || '---')}
+                                        {isStateView ? (STATE_NAMES[item.uf] || item.uf) : (item.city?.name || '---')}
                                     </h3>
                                     <div className="flex items-center gap-3 mt-1">
                                         <div className="flex flex-col">

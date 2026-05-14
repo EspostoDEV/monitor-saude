@@ -73,7 +73,9 @@ class EpidemicController extends Controller
                     $record->alert_explanation = $this->riskService->getAlertExplanation($record->level, $record->incidence, $record->cases);
                     $record->trend_explanation = $this->riskService->getTrendExplanation($record->trend, $record->incidence);
                 }
-                return $records->values()->all();
+                
+                // Resolvemos o Resource para Array antes de salvar no Cache para evitar erro de serialização
+                return EpidemicRecordResource::collection($records)->resolve();
             });
         } else {
             // Visão Nacional - Cache por UF
@@ -123,11 +125,12 @@ class EpidemicController extends Controller
             'total_cases' => (int) EpidemicRecord::where('year', $year)->where('disease_type', $disease)->sum('cases'),
             'new_cases' => (int) EpidemicRecord::where('year', $year)->where('disease_type', $disease)->where('epi_week', $latestWeek)->sum('cases'),
             'latest_week' => $latestWeek,
+            'last_sync' => EpidemicRecord::max('updated_at'),
         ];
 
         return Inertia::render('Dashboard', [
             'filters' => $request->only(['uf', 'disease', 'year']),
-            'records' => $request->uf ? EpidemicRecordResource::collection($records) : $records,
+            'records' => $records,
             'stats' => $stats,
         ]);
     }

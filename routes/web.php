@@ -10,4 +10,5 @@ Route::get('/api/history/{cityId}', [EpidemicController::class, 'history']);
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/sync-status', [SyncStatusController::class, 'index'])->name('sync.status');
     Route::post('/sync-trigger', [SyncStatusController::class, 'sync'])->name('sync.trigger');
+    Route::get('/sync-logs', [SyncStatusController::class, 'logs'])->name('sync.logs');
 });

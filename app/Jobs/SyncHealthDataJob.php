@@ -28,18 +28,27 @@ class SyncHealthDataJob implements ShouldQueue
      */
     public $backoff = [60, 300, 600]; // 1min, 5min, 10min
 
-    protected string $disease;
-    protected ?int $ibgeCode = null;
-    protected ?string $uf = null;
+    /**
+     * The number of seconds the job can run before timing out.
+     *
+     * @var int
+     */
+    public $timeout = 3600; // 1 hora
+
+    public string $disease;
+    public ?int $ibgeCode = null;
+    public ?string $uf = null;
+    public ?string $sessionId = null;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $disease, ?int $ibgeCode = null, ?string $uf = null)
+    public function __construct(string $disease, ?int $ibgeCode = null, ?string $uf = null, ?string $sessionId = null)
     {
         $this->disease = $disease;
         $this->ibgeCode = $ibgeCode;
         $this->uf = $uf;
+        $this->sessionId = $sessionId;
     }
 
     /**
@@ -47,9 +56,13 @@ class SyncHealthDataJob implements ShouldQueue
      */
     public function handle(HealthDataService $service): void
     {
-        Log::info("Job de sincronização iniciado: {$this->disease}" . ($this->uf ? " [UF: {$this->uf}]" : ''));
+        Log::info("JOB DEBUG: Iniciando Handle. Doença: {$this->disease}, UF: {$this->uf}, Session: {$this->sessionId}");
         
-        $count = $service->sync($this->disease, $this->ibgeCode, $this->uf);
+        if (!$this->sessionId) {
+            Log::warning("JOB WARNING: SessionId está vazio!");
+        }
+
+        $count = $service->sync($this->disease, $this->ibgeCode, $this->uf, $this->sessionId);
         
         Log::info("Job de sincronização concluído: {$this->disease}. {$count} registros processados.");
     }
