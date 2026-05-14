@@ -15,22 +15,22 @@ class InfoGripeService
     public function fetch(int $ibgeCode, string $disease = 'srag'): array
     {
         $host = self::HOSTS[$disease] ?? self::HOSTS['srag'];
-
-        // Fiocruz requires /dashboard/ path for alertcity
         $path = ($disease === 'srag') ? "/api/v1/dashboard/alertcity" : "/api/v1/alertcity";
+        
+        $year = now()->year;
 
-        $response = Http::withoutVerifying()
+        $response = Http::withOptions(['verify' => true]) // SSL Habilitado (PRD Compliance)
             ->connectTimeout(15)
             ->timeout(30)
-            ->retry(2, 100)
+            ->retry(3, 200) // Mais resiliência para a Fiocruz
             ->get("{$host}{$path}", [
                 'geocode' => $ibgeCode,
                 'disease' => $disease,
                 'format' => 'json',
                 'ew_start' => 1,
-                'ey_start' => 2025,
+                'ey_start' => $year,
                 'ew_end' => 53,
-                'ey_end' => 2025,
+                'ey_end' => $year,
             ]);
 
         return $response->json() ?? [];

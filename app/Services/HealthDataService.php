@@ -25,10 +25,15 @@ class HealthDataService
         $cities = $query->get();
         $count = 0;
         
-        // Resolve datas dinâmicas (Issue 5)
+        // Resolve datas dinâmicas com janela de consolidação (Issue 1, 5)
+        // Usamos 2 semanas de lag pois os dados epidemiológicos demoram a ser notificados e validados
+        $consolidationLag = 2;
         $now = Carbon::now();
-        $currentYear = $now->year;
-        $currentWeek = $now->weekOfYear - 1; // Semana anterior para garantir dados consolidados
+        $targetDate = $now->subWeeks($consolidationLag);
+        
+        $currentYear = $targetDate->year;
+        $currentWeek = $targetDate->weekOfYear;
+
         if ($currentWeek <= 0) {
             $currentYear--;
             $currentWeek = 52;

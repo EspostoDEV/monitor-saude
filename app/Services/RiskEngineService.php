@@ -19,10 +19,12 @@ class RiskEngineService
             $level = 2;
         }
 
-        // Sanity Check: Cidades pequenas com pouquíssimos casos absolutos.
-        // Se houver menos de 10 casos na semana, rebaixamos o alerta para evitar falsos positivos
-        // de surtos estatísticos sem relevância populacional.
-        if ($cases < 10 && $level === 4) {
+        // Sanity Check: Cidades pequenas com pouquíssimos casos absolutos (Issue 8)
+        // Se houver menos de 5 casos totais, mantemos nível 1 para evitar ruído estatístico.
+        // Se houver entre 5 e 10 casos e o nível for Crítico, rebaixamos para Alerta.
+        if ($cases < 5) {
+            $level = 1;
+        } elseif ($cases < 10 && $level === 4) {
             $level = 3;
         }
 
