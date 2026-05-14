@@ -1,14 +1,15 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { Activity } from 'lucide-react';
+import { Activity, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { getLevelColor } from '@/Utils/epidemiology';
 
-// Dashboard Components
-import ControlHeader from '@/Components/Dashboard/ControlHeader';
-import EpidemiologyMap from '@/Components/Dashboard/EpidemiologyMap';
-import StatsSidebar from '@/Components/Dashboard/StatsSidebar';
-import CityDetailsCard from '@/Components/Dashboard/CityDetailsCard';
+// Dashboard Components (Lazy loaded for better TTI)
+const ControlHeader = React.lazy(() => import('@/Components/Dashboard/ControlHeader'));
+const EpidemiologyMap = React.lazy(() => import('@/Components/Dashboard/EpidemiologyMap'));
+const StatsSidebar = React.lazy(() => import('@/Components/Dashboard/StatsSidebar'));
+const CityDetailsCard = React.lazy(() => import('@/Components/Dashboard/CityDetailsCard'));
+
 
 const STATE_COORDS = {
     'AC': [-9.0238, -70.8120], 'AL': [-9.5713, -36.7820], 'AP': [0.0356, -51.0705],
@@ -169,47 +170,54 @@ export default function Dashboard({ records, filters, stats }) {
                 </div>
             )}
             
-            <ControlHeader 
-                filters={filters} 
-                handleBack={handleBack} 
-                stats={stats} 
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-                <div className="lg:col-span-3 bg-slate-900/50 rounded-[2rem] border border-white/5 overflow-hidden shadow-3xl relative flex flex-col">
-                    <div className="flex-1 relative">
-                        <EpidemiologyMap 
-                            mapState={mapState}
-                            isStateView={isStateView}
-                            geoData={geoData}
-                            geoJsonStyle={geoJsonStyle}
-                            onEachFeature={onEachFeature}
-                            dataList={dataList}
-                            selectedRecord={selectedRecord}
-                            setSelectedRecord={setSelectedRecord}
-                            getLevelColor={getLevelColor}
-                        />
-
-                        <CityDetailsCard 
-                            selectedRecord={selectedRecord}
-                            setSelectedRecord={setSelectedRecord}
-                            history={history}
-                            STATE_NAMES={STATE_NAMES}
-                        />
-                    </div>
+            <React.Suspense fallback={
+                <div className="h-full w-full bg-slate-950 flex flex-col items-center justify-center">
+                    <Loader2 className="w-10 h-10 text-emerald-500 animate-spin opacity-20 mb-4" />
+                    <span className="text-[10px] text-slate-700 font-black tracking-[0.3em] uppercase">Inicializando Sistema...</span>
                 </div>
-
-                <StatsSidebar 
-                    isStateView={isStateView}
-                    filters={filters}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    sortedDataList={sortedDataList}
-                    handleStateClick={handleStateClick}
-                    setSelectedRecord={setSelectedRecord}
-                    STATE_NAMES={STATE_NAMES}
+            }>
+                <ControlHeader 
+                    filters={filters} 
+                    handleBack={handleBack} 
+                    stats={stats} 
                 />
-            </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
+                    <div className="lg:col-span-3 bg-slate-900/50 rounded-[2rem] border border-white/5 overflow-hidden shadow-3xl relative flex flex-col">
+                        <div className="flex-1 relative">
+                            <EpidemiologyMap 
+                                mapState={mapState}
+                                isStateView={isStateView}
+                                geoData={geoData}
+                                geoJsonStyle={geoJsonStyle}
+                                onEachFeature={onEachFeature}
+                                dataList={dataList}
+                                selectedRecord={selectedRecord}
+                                setSelectedRecord={setSelectedRecord}
+                                getLevelColor={getLevelColor}
+                            />
+
+                            <CityDetailsCard 
+                                selectedRecord={selectedRecord}
+                                setSelectedRecord={setSelectedRecord}
+                                history={history}
+                                STATE_NAMES={STATE_NAMES}
+                            />
+                        </div>
+                    </div>
+
+                    <StatsSidebar 
+                        isStateView={isStateView}
+                        filters={filters}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        sortedDataList={sortedDataList}
+                        handleStateClick={handleStateClick}
+                        setSelectedRecord={setSelectedRecord}
+                        STATE_NAMES={STATE_NAMES}
+                    />
+                </div>
+            </React.Suspense>
 
             <style dangerouslySetInnerHTML={{ __html: `
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
