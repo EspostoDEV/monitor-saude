@@ -81,11 +81,17 @@ class EpidemicController extends Controller
             // Visão Nacional - Cache por UF
             $cacheKey = "epi_intel_national_{$year}_{$disease}";
             $records = \Cache::remember($cacheKey, 600, function() use ($year, $disease) {
+                // Otimização: Pegamos a semana máxima antes da query principal
+                $maxWeek = EpidemicRecord::where('year', $year)->where('disease_type', $disease)->max('epi_week');
+
                 return EpidemicRecord::query()
                     ->select('cities.uf')
                     ->selectRaw('SUM(cases) as total_cases')
-                    ->selectRaw('SUM(CASE WHEN epi_week = (SELECT MAX(epi_week) FROM epidemic_records WHERE year = ?) THEN cases ELSE 0 END) as new_cases', [$year])
-                    ->selectRaw('AVG(incidence) as incidence')
+                    ->selectRaw('SUM(CASE WHEN epi_week = ? THEN cases ELSE 0 END) as new_cases', [$maxWeek])
+                    // Correção Matemática: Incidência real (Soma casos / Soma pop * 100k)
+                    // Como não temos a população agregada por UF fácil aqui, vamos manter o AVG por enquanto, 
+                    // mas marcar para uma View Materializada no futuro se precisarmos de precisão científica total.
+                    ->selectRaw('AVG(incidence) as incidence') 
                     ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
                     ->where('year', $year)
                     ->where('disease_type', $disease)
@@ -135,10 +141,13 @@ class EpidemicController extends Controller
         ]);
     }
 
-    public function history(int $cityId): JsonResponse
+    public function history(Request $request, int $cityId): JsonResponse
     {
+        $disease = $request->query('disease', 'dengue');
+
         $history = EpidemicRecord::query()
             ->where('city_id', $cityId)
+            ->where('disease_type', $disease)
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')
             ->limit(12)

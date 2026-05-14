@@ -74,7 +74,8 @@ export default function Dashboard({ records, filters, stats }) {
         if (selectedRecord) {
             setLoadingHistory(true);
             const cityId = selectedRecord.city_id || selectedRecord.id;
-            axios.get(`/api/history/${cityId}`)
+            const disease = filters.disease || 'dengue';
+            axios.get(`/api/history/${cityId}?disease=${disease}`)
                 .then(res => {
                     setHistory(res.data);
                     setLoadingHistory(false);
