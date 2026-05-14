@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pgsql, pdo_pgsql, bcmath, soap, intl, readline
           coverage: none
 
       - name: Setup Node.js
@@ -65,6 +65,21 @@ jobs:
       matrix:
         shard: [1, 2] # Adjusted for smaller project, can be increased
 
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -72,7 +87,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pgsql, pdo_pgsql, bcmath, soap, intl, readline
           coverage: none
 
       - name: Install PHP dependencies
@@ -83,15 +98,14 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      - name: Create SQLite Database
-        run: |
-          mkdir -p database
-          touch database/database.sqlite
-
       - name: Run Tests
         env:
-          DB_CONNECTION: sqlite
-          DB_DATABASE: database/database.sqlite
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing
+          DB_USERNAME: postgres
+          DB_PASSWORD: password
         run: php artisan test --parallel --recreate-databases --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload logs on failure
@@ -111,6 +125,21 @@ jobs:
     # Only run burn-in on PRs or schedule to avoid redundant local runs
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'
 
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -118,7 +147,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, readline
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pgsql, pdo_pgsql, bcmath, soap, intl, readline
           coverage: none
 
       - name: Install PHP dependencies
@@ -128,13 +157,15 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
-          mkdir -p database
-          touch database/database.sqlite
 
       - name: Run burn-in loop (5 iterations of Feature tests)
         env:
-          DB_CONNECTION: sqlite
-          DB_DATABASE: database/database.sqlite
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing
+          DB_USERNAME: postgres
+          DB_PASSWORD: password
         run: |
           echo "🔥 Starting burn-in loop for Feature tests"
           for i in {1..5}; do
