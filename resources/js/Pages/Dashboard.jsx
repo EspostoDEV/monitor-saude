@@ -1,11 +1,25 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, GeoJSON } from 'react-leaflet';
-import { Activity, Map as MapIcon, ShieldAlert, Info, ArrowLeft, TrendingUp, TrendingDown, Users, Calendar, X, Search, Clock } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from 'recharts';
+import { useMap } from 'react-leaflet';
+import { Activity, Map as MapIcon, ShieldAlert, Info, ArrowLeft, TrendingUp, TrendingDown, Users, Calendar, X, Search, Clock, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { getLevelColor } from '@/Utils/epidemiology';
 import 'leaflet/dist/leaflet.css';
+
+// Lazy load heavy components (Issue 10 - Performance)
+const MapContainer = React.lazy(() => import('react-leaflet').then(m => ({ default: m.MapContainer })));
+const TileLayer = React.lazy(() => import('react-leaflet').then(m => ({ default: m.TileLayer })));
+const CircleMarker = React.lazy(() => import('react-leaflet').then(m => ({ default: m.CircleMarker })));
+const GeoJSON = React.lazy(() => import('react-leaflet').then(m => ({ default: m.GeoJSON })));
+
+const LineChart = React.lazy(() => import('recharts').then(m => ({ default: m.LineChart })));
+const Line = React.lazy(() => import('recharts').then(m => ({ default: m.Line })));
+const XAxis = React.lazy(() => import('recharts').then(m => ({ default: m.XAxis })));
+const YAxis = React.lazy(() => import('recharts').then(m => ({ default: m.YAxis })));
+const CartesianGrid = React.lazy(() => import('recharts').then(m => ({ default: m.CartesianGrid })));
+const ChartTooltip = React.lazy(() => import('recharts').then(m => ({ default: m.Tooltip })));
+const ResponsiveContainer = React.lazy(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })));
+
 
 const STATE_COORDS = {
     'AC': [-9.0238, -70.8120], 'AL': [-9.5713, -36.7820], 'AP': [0.0356, -51.0705],
@@ -214,32 +228,39 @@ export default function Dashboard({ records, filters, stats }) {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
                 <div className="lg:col-span-3 bg-slate-900/50 rounded-[2rem] border border-white/5 overflow-hidden shadow-3xl relative flex flex-col">
                     <div className="flex-1 relative">
-                        <MapContainer center={mapState.center} zoom={mapState.zoom} className="h-full w-full bg-slate-900" zoomControl={false}>
-                            <ChangeView center={mapState.center} zoom={mapState.zoom} />
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                            
-                            {isStateView ? (
-                                geoData && <GeoJSON data={geoData} style={geoJsonStyle} onEachFeature={onEachFeature} />
-                            ) : (
-                                dataList.map((record) => (
-                                    record.city?.lat && (
-                                        <CircleMarker
-                                            key={record.id}
-                                            center={[record.city.lat, record.city.lng]}
-                                            pathOptions={{
-                                                fillColor: getLevelColor(record.level, 0.8),
-                                                fillOpacity: 0.7,
-                                                color: selectedRecord?.id === record.id ? '#fff' : 'transparent',
-                                                weight: 2
-                                            }}
-                                            radius={selectedRecord?.id === record.id ? 15 : 6 + Math.sqrt(record.cases || 0)}
-                                            eventHandlers={{ click: () => setSelectedRecord(record) }}
-                                        />
-                                    )
-                                ))
-                            )}
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png" pointerEvents="none" />
-                        </MapContainer>
+                        <React.Suspense fallback={
+                            <div className="h-full w-full bg-slate-900 flex flex-col items-center justify-center gap-4">
+                                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin opacity-20" />
+                                <span className="text-xs text-slate-700 font-medium tracking-widest uppercase">Carregando Mapa...</span>
+                            </div>
+                        }>
+                            <MapContainer center={mapState.center} zoom={mapState.zoom} className="h-full w-full bg-slate-900" zoomControl={false}>
+                                <ChangeView center={mapState.center} zoom={mapState.zoom} />
+                                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                                
+                                {isStateView ? (
+                                    geoData && <GeoJSON data={geoData} style={geoJsonStyle} onEachFeature={onEachFeature} />
+                                ) : (
+                                    dataList.map((record) => (
+                                        record.city?.lat && (
+                                            <CircleMarker
+                                                key={record.id}
+                                                center={[record.city.lat, record.city.lng]}
+                                                pathOptions={{
+                                                    fillColor: getLevelColor(record.level, 0.8),
+                                                    fillOpacity: 0.7,
+                                                    color: selectedRecord?.id === record.id ? '#fff' : 'transparent',
+                                                    weight: 2
+                                                }}
+                                                radius={selectedRecord?.id === record.id ? 15 : 6 + Math.sqrt(record.cases || 0)}
+                                                eventHandlers={{ click: () => setSelectedRecord(record) }}
+                                            />
+                                        )
+                                    ))
+                                )}
+                                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png" pointerEvents="none" />
+                            </MapContainer>
+                        </React.Suspense>
 
                         {selectedRecord && (
                             <div className="absolute inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-sm">
@@ -315,38 +336,40 @@ export default function Dashboard({ records, filters, stats }) {
                                             </h3>
                                             <div className="flex-1 w-full min-h-[250px]">
                                                 {history.length > 0 ? (
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <LineChart data={history}>
-                                                            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                                            <XAxis 
-                                                                dataKey="week" 
-                                                                axisLine={false} 
-                                                                tickLine={false} 
-                                                                tick={({ x, y, payload }) => {
-                                                                    const item = history.find(h => h.week === payload.value);
-                                                                    return (
-                                                                        <text x={x} y={y + 12} fill="#475569" fontSize={9} textAnchor="middle" fontWeight="bold">
-                                                                            {item?.month}
-                                                                        </text>
-                                                                    );
-                                                                }}
-                                                                interval={2}
-                                                            />
-                                                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10}} />
-                                                            <ChartTooltip content={({ active, payload }) => (
-                                                                active && payload && payload.length > 0 && (
-                                                                    <div className="bg-slate-900 border border-white/10 p-3 rounded-xl shadow-2xl">
-                                                                        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">
-                                                                            {payload[0].payload.month} • {payload[0].payload.week_range}
-                                                                        </p>
-                                                                        <p className="text-sm font-bold text-emerald-400">{payload[0].value} casos</p>
-                                                                        <p className="text-[9px] text-slate-400 italic">Semana Epidemiológica #{payload[0].payload.week}</p>
-                                                                    </div>
-                                                                )
-                                                            )} />
-                                                            <Line type="monotone" dataKey="cases" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} animationDuration={1000} />
-                                                        </LineChart>
-                                                    </ResponsiveContainer>
+                                                    <React.Suspense fallback={<div className="h-full flex items-center justify-center text-slate-700 text-xs italic">Preparando gráficos...</div>}>
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <LineChart data={history}>
+                                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                                <XAxis 
+                                                                    dataKey="week" 
+                                                                    axisLine={false} 
+                                                                    tickLine={false} 
+                                                                    tick={({ x, y, payload }) => {
+                                                                        const item = history.find(h => h.week === payload.value);
+                                                                        return (
+                                                                            <text x={x} y={y + 12} fill="#475569" fontSize={9} textAnchor="middle" fontWeight="bold">
+                                                                                {item?.month}
+                                                                            </text>
+                                                                        );
+                                                                    }}
+                                                                    interval={2}
+                                                                />
+                                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10}} />
+                                                                <ChartTooltip content={({ active, payload }) => (
+                                                                    active && payload && payload.length > 0 && (
+                                                                        <div className="bg-slate-900 border border-white/10 p-3 rounded-xl shadow-2xl">
+                                                                            <p className="text-[10px] font-black text-slate-500 uppercase mb-1">
+                                                                                {payload[0].payload.month} • {payload[0].payload.week_range}
+                                                                            </p>
+                                                                            <p className="text-sm font-bold text-emerald-400">{payload[0].value} casos</p>
+                                                                            <p className="text-[9px] text-slate-400 italic">Semana Epidemiológica #{payload[0].payload.week}</p>
+                                                                        </div>
+                                                                    )
+                                                                )} />
+                                                                <Line type="monotone" dataKey="cases" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} animationDuration={1000} />
+                                                            </LineChart>
+                                                        </ResponsiveContainer>
+                                                    </React.Suspense>
                                                 ) : <div className="h-full flex items-center justify-center text-slate-700 text-xs italic">Processando histórico...</div>}
                                             </div>
                                         </div>
