@@ -9,7 +9,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE EXTENSION IF NOT EXISTS postgis');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('CREATE EXTENSION IF NOT EXISTS postgis');
+        }
 
         Schema::table('cities', function (Blueprint $table) {
             if (Schema::hasColumn('cities', 'lat')) {
@@ -17,8 +19,13 @@ return new class extends Migration
             }
 
             if (! Schema::hasColumn('cities', 'location')) {
-                $table->geography('location', 'point', 4326);
-                $table->spatialIndex('location');
+                if (DB::getDriverName() === 'pgsql') {
+                    $table->geography('location', 'point', 4326);
+                    $table->spatialIndex('location');
+                } else {
+                    // Fallback para SQLite/Ambientes de Teste sem PostGIS
+                    $table->text('location')->nullable();
+                }
             }
         });
     }
@@ -26,7 +33,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('cities', function (Blueprint $table) {
-            $table->dropSpatialIndex(['location']);
+            if (DB::getDriverName() === 'pgsql') {
+                $table->dropSpatialIndex(['location']);
+            }
             $table->dropColumn('location');
             $table->decimal('lat', 10, 8)->nullable();
             $table->decimal('lng', 11, 8)->nullable();
