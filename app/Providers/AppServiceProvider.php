@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
+use App\Models\EpidemicRecord;
+use App\Observers\EpidemicRecordObserver;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,6 +22,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        EpidemicRecord::observe(EpidemicRecordObserver::class);
     }
 }
