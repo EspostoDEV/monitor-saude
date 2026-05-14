@@ -46,7 +46,7 @@ return new class extends Migration
 
             DB::statement('CREATE UNIQUE INDEX idx_mv_uf_epi_stats_unique ON mv_uf_epidemic_stats (uf, year, epi_week, disease_type)');
         } else {
-            throw new \RuntimeException('Database driver '.$driver.' not supported for this migration.');
+            throw new RuntimeException('Database driver '.$driver.' not supported for this migration.');
         }
     }
 
