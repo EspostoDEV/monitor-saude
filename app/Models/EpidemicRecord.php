@@ -57,7 +57,7 @@ class EpidemicRecord extends Model
                 ->orderBy("$table.updated_at", 'desc');
         }
 
-        // Fallback para SQLite: GROUP BY (Nota: No SQLite isso retorna uma linha do grupo, 
+        // Fallback para SQLite: GROUP BY (Nota: No SQLite isso retorna uma linha do grupo,
         // mas não garante estritamente que seja a 'mais recente' sem subqueries complexas.
         // Para fins de teste e compatibilidade cross-db básica, o GROUP BY resolve o erro de sintaxe).
         return $query->groupBy($columns);
