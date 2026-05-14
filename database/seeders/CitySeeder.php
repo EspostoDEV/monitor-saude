@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\City;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,10 +13,11 @@ class CitySeeder extends Seeder
     {
         // Dataset local offline-first
         $path = database_path('data/municipios.json');
-        
-        if (!file_exists($path)) {
+
+        if (! file_exists($path)) {
             Log::error("Arquivo de municípios não encontrado em: $path");
-            $this->command->error("Arquivo de municípios não encontrado!");
+            $this->command->error('Arquivo de municípios não encontrado!');
+
             return;
         }
 
@@ -25,7 +25,8 @@ class CitySeeder extends Seeder
         $citiesData = json_decode($json, true);
 
         if (empty($citiesData)) {
-            Log::error("JSON de municípios vazio ou inválido.");
+            Log::error('JSON de municípios vazio ou inválido.');
+
             return;
         }
 
@@ -47,7 +48,7 @@ class CitySeeder extends Seeder
             })
             ->values();
 
-        $this->command->info("Populando " . $cities->count() . " cidades com coordenadas reais...");
+        $this->command->info('Populando '.$cities->count().' cidades com coordenadas reais...');
 
         foreach ($cities->chunk(500) as $chunk) {
             City::insert($chunk->toArray());
@@ -61,7 +62,7 @@ class CitySeeder extends Seeder
             21 => 'MA', 22 => 'PI', 23 => 'CE', 24 => 'RN', 25 => 'PB', 26 => 'PE', 27 => 'AL', 28 => 'SE', 29 => 'BA',
             31 => 'MG', 32 => 'ES', 33 => 'RJ', 35 => 'SP',
             41 => 'PR', 42 => 'SC', 43 => 'RS',
-            50 => 'MS', 51 => 'MT', 52 => 'GO', 53 => 'DF'
+            50 => 'MS', 51 => 'MT', 52 => 'GO', 53 => 'DF',
         ];
 
         return $ufs[$code] ?? '??';

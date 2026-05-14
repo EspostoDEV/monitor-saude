@@ -13,7 +13,7 @@ return [
     'thresholds' => [
         'yellow' => 100,
         'orange' => 300,
-        'red'    => 600,
+        'red' => 600,
     ],
 
     /*

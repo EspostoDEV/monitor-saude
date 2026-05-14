@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,7 +9,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        \DB::statement("
+        DB::statement('
             CREATE MATERIALIZED VIEW mv_uf_epidemic_stats AS
             SELECT 
                 cities.uf, 
@@ -25,13 +23,13 @@ return new class extends Migration
             FROM epidemic_records
             JOIN cities ON cities.id = epidemic_records.city_id
             GROUP BY cities.uf, epidemic_records.year, epidemic_records.epi_week, epidemic_records.disease_type
-        ");
+        ');
 
-        \DB::statement("CREATE UNIQUE INDEX idx_mv_uf_epi_stats_unique ON mv_uf_epidemic_stats (uf, year, epi_week, disease_type)");
+        DB::statement('CREATE UNIQUE INDEX idx_mv_uf_epi_stats_unique ON mv_uf_epidemic_stats (uf, year, epi_week, disease_type)');
     }
 
     public function down(): void
     {
-        \DB::statement("DROP MATERIALIZED VIEW IF EXISTS mv_uf_epidemic_stats");
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS mv_uf_epidemic_stats');
     }
 };

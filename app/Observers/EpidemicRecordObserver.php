@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\EpidemicRecord;
+use App\Models\EpidemicRecordAudit;
 
 class EpidemicRecordObserver
 {
@@ -21,14 +22,14 @@ class EpidemicRecordObserver
     {
         if ($epidemicRecord->isDirty('cases') && $epidemicRecord->getOriginal('cases') !== null) {
             try {
-                \App\Models\EpidemicRecordAudit::create([
+                EpidemicRecordAudit::create([
                     'epidemic_record_id' => $epidemicRecord->id,
                     'old_cases' => $epidemicRecord->getOriginal('cases'),
                     'new_cases' => $epidemicRecord->cases,
                     'reason' => 'Sync/API Correction',
                 ]);
             } catch (\Exception $e) {
-                \Log::error("Falha ao gravar auditoria epidemiológica: " . $e->getMessage());
+                \Log::error('Falha ao gravar auditoria epidemiológica: '.$e->getMessage());
             }
         }
     }

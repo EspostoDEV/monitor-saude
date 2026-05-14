@@ -28,7 +28,10 @@ class SyncSession extends Model
 
     public function getProgressAttribute()
     {
-        if ($this->total_cities <= 0) return 0;
+        if ($this->total_cities <= 0) {
+            return 0;
+        }
+
         return round(($this->processed_cities / $this->total_cities) * 100, 1);
     }
 }

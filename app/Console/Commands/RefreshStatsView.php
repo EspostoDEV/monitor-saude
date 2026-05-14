@@ -16,11 +16,11 @@ class RefreshStatsView extends Command
     public function handle()
     {
         $this->info('Refreshing Materialized View (CONCURRENTLY)...');
-        
-        \DB::statement("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_uf_epidemic_stats");
-        
-        $this->info("Materialized View refreshed successfully!");
-        
+
+        \DB::statement('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_uf_epidemic_stats');
+
+        $this->info('Materialized View refreshed successfully!');
+
         return 0;
     }
 }

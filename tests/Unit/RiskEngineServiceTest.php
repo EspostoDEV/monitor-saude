@@ -3,8 +3,8 @@
 namespace Tests\Unit;
 
 use App\Services\RiskEngineService;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 
 class RiskEngineServiceTest extends TestCase
 {
@@ -13,7 +13,7 @@ class RiskEngineServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new RiskEngineService();
+        $this->service = new RiskEngineService;
     }
 
     #[DataProvider('alertLevelDataProvider')]
@@ -30,11 +30,11 @@ class RiskEngineServiceTest extends TestCase
             'level 2 - yellow' => [150.0, 20, 'stable', 2],
             'level 3 - orange' => [350.0, 20, 'stable', 3],
             'level 4 - red' => [650.0, 20, 'stable', 4],
-            
+
             // Sanity Check: < 5 cases -> always level 1
             'sanity check - high incidence but < 5 cases' => [700.0, 4, 'up', 1],
             'sanity check - orange incidence but < 5 cases' => [350.0, 3, 'up', 1],
-            
+
             // Sanity Check: < 10 cases and level 4 -> downgrade to 3
             'sanity check - red incidence but < 10 cases' => [700.0, 8, 'up', 3],
             'no downgrade - red incidence and 10 cases' => [700.0, 10, 'up', 4],

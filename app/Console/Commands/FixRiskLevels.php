@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\EpidemicRecord;
 use App\Services\RiskEngineService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 
 class FixRiskLevels extends Command
 {
@@ -56,7 +57,7 @@ class FixRiskLevels extends Command
                 if ($record->level !== $newLevel) {
                     $record->update(['level' => $newLevel]);
                 }
-                
+
                 $bar->advance();
             }
         });
@@ -64,10 +65,10 @@ class FixRiskLevels extends Command
         $bar->finish();
         $this->newLine();
         $this->info('Risk levels normalized successfully.');
-        
+
         // Refresh materialized view to reflect changes in national view
         $this->info('Refreshing materialized view...');
-        \Illuminate\Support\Facades\Artisan::call('app:refresh-stats-view');
+        Artisan::call('app:refresh-stats-view');
         $this->info('Done.');
     }
 }

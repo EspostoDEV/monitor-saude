@@ -4,16 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\EpidemicRecordResource;
 use App\Models\EpidemicRecord;
-use App\Services\TrendAnalysisService;
 use App\Services\RiskEngineService;
+use App\Services\TrendAnalysisService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Http\JsonResponse;
 
 class EpidemicController extends Controller
 {
     protected TrendAnalysisService $trendService;
+
     protected RiskEngineService $riskService;
 
     public function __construct(TrendAnalysisService $trendService, RiskEngineService $riskService)
@@ -40,7 +41,7 @@ class EpidemicController extends Controller
 
         if ($uf) {
             // Otimização Arquitetural (Winston Plan): Totais da UF e registros em um único fluxo
-            $records = \Cache::remember("epi_intel_{$uf}_{$year}_{$disease}", 600, function() use ($uf, $year, $disease, $latestWeek) {
+            $records = \Cache::remember("epi_intel_{$uf}_{$year}_{$disease}", 600, function () use ($uf, $year, $disease, $latestWeek) {
                 // Subquery para totais acumulados por cidade
                 $totalsSubquery = EpidemicRecord::query()
                     ->select('city_id', \DB::raw('SUM(cases) as total_cases'))
@@ -87,7 +88,7 @@ class EpidemicController extends Controller
             $records = $records['records'];
         } else {
             // Visão Nacional - Via Materialized View
-            $records = \Cache::remember("epi_intel_national_{$year}_{$disease}", 600, function() use ($year, $disease, $latestWeek) {
+            $records = \Cache::remember("epi_intel_national_{$year}_{$disease}", 600, function () use ($year, $disease, $latestWeek) {
                 return \DB::table('mv_uf_epidemic_stats')
                     ->select('uf', 'total_cases', 'real_incidence as incidence')
                     ->selectRaw('total_cases as new_cases')
@@ -95,9 +96,10 @@ class EpidemicController extends Controller
                     ->where('epi_week', $latestWeek)
                     ->where('disease_type', $disease)
                     ->get()
-                    ->map(function($item) use ($disease) {
+                    ->map(function ($item) use ($disease) {
                         $trend = $this->trendService->calculateTrendForUf($item->uf, $disease);
-                        $level = $this->riskService->getAlertLevel($item->incidence, (int)$item->new_cases, $trend);
+                        $level = $this->riskService->getAlertLevel($item->incidence, (int) $item->new_cases, $trend);
+
                         return [
                             'uf' => $item->uf,
                             'total_cases' => (int) $item->total_cases,

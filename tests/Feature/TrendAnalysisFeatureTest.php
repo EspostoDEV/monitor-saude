@@ -24,7 +24,7 @@ class TrendAnalysisFeatureTest extends TestCase
     {
         // GIVEN: 10 cities in SP
         $cities = City::factory()->count(10)->create(['uf' => 'SP']);
-        
+
         // Only 8 cities have records for the latest week (80% < 90%)
         foreach ($cities->take(8) as $city) {
             EpidemicRecord::factory()->create([
@@ -46,7 +46,7 @@ class TrendAnalysisFeatureTest extends TestCase
     {
         // GIVEN: 10 cities in SP
         $cities = City::factory()->count(10)->create(['uf' => 'SP']);
-        
+
         // 9 cities have records for the latest week (90% >= 90%)
         // We also need historical data to avoid 'stable' due to lack of weeks
         for ($w = 15; $w <= 20; $w++) {

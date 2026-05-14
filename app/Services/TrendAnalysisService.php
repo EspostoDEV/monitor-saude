@@ -34,8 +34,10 @@ class TrendAnalysisService
     public function calculateTrendForUf(string $uf, string $disease): string
     {
         $totalCitiesInUf = City::where('uf', $uf)->count();
-        
-        if ($totalCitiesInUf === 0) return 'stable';
+
+        if ($totalCitiesInUf === 0) {
+            return 'stable';
+        }
 
         $deduplicatedSubquery = EpidemicRecord::query()
             ->selectRaw('DISTINCT ON (city_id, year, epi_week) *')
@@ -105,7 +107,7 @@ class TrendAnalysisService
         // Detecção de "Queda Brusca" na última semana (Responsividade Imediata)
         $latestWeekCases = $records->first()->cases;
         $previousWeekCases = $records->get(1)?->cases ?? $latestWeekCases;
-        
+
         // Se a última semana caiu mais de 50% em relação à anterior, priorizamos o sinal de queda
         if ($latestWeekCases < ($previousWeekCases * 0.5)) {
             return 'down';

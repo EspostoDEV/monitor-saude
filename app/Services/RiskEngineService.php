@@ -13,9 +13,9 @@ class RiskEngineService
         $thresholds = config('epidemiology.thresholds', [
             'yellow' => 100,
             'orange' => 300,
-            'red'    => 600,
+            'red' => 600,
         ]);
-        
+
         $sanity = config('epidemiology.sanity_check', [
             'min_cases_for_stable' => 5,
             'min_cases_for_critical' => 10,
@@ -58,12 +58,12 @@ class RiskEngineService
     public function getAlertExplanation(int $level, float $incidence, int $cases): string
     {
         return match ($level) {
-            4 => "Alerta Crítico: Incidência de " . round($incidence, 1) . " por 100k habitantes supera o limite de 600, indicando surto descontrolado na região.",
-            3 => $cases < 10 && $incidence > 600 
+            4 => 'Alerta Crítico: Incidência de '.round($incidence, 1).' por 100k habitantes supera o limite de 600, indicando surto descontrolado na região.',
+            3 => $cases < 10 && $incidence > 600
                 ? "Alerta Moderado: Embora a incidência seja estatisticamente alta, o baixo volume absoluto de casos ($cases) sugere ruído estatístico. Vigilância preventiva recomendada."
-                : "Alerta Laranja: Transmissão sustentada detectada. Incidência acima de 300 indica necessidade de intervenção imediata.",
-            2 => "Alerta Amarelo: Atenção necessária. Incidência acima de 100 indica início de circulação viral acima do esperado.",
-            default => "Situação Estável: Incidência sob controle dentro dos padrões de segurança epidemiológica.",
+                : 'Alerta Laranja: Transmissão sustentada detectada. Incidência acima de 300 indica necessidade de intervenção imediata.',
+            2 => 'Alerta Amarelo: Atenção necessária. Incidência acima de 100 indica início de circulação viral acima do esperado.',
+            default => 'Situação Estável: Incidência sob controle dentro dos padrões de segurança epidemiológica.',
         };
     }
 
@@ -73,10 +73,10 @@ class RiskEngineService
     public function getTrendExplanation(string $trend, float $incidence): string
     {
         return match ($trend) {
-            'up' => "Tendência de Alta: A média móvel de casos cresceu mais de 15% nas últimas 3 semanas, indicando aceleração do surto.",
-            'down' => "Tendência de Queda: Redução significativa na velocidade de contágio. A curva está em declínio.",
-            'uncertain' => "Dados em Consolidação: Menos de 90% dos municípios da região reportaram dados para a última semana. A tendência atual pode ser imprecisa até a conclusão do quórum.",
-            default => "Estabilidade: O número de novos casos mantém-se constante, sem sinais de aceleração ou recuo imediato.",
+            'up' => 'Tendência de Alta: A média móvel de casos cresceu mais de 15% nas últimas 3 semanas, indicando aceleração do surto.',
+            'down' => 'Tendência de Queda: Redução significativa na velocidade de contágio. A curva está em declínio.',
+            'uncertain' => 'Dados em Consolidação: Menos de 90% dos municípios da região reportaram dados para a última semana. A tendência atual pode ser imprecisa até a conclusão do quórum.',
+            default => 'Estabilidade: O número de novos casos mantém-se constante, sem sinais de aceleração ou recuo imediato.',
         };
     }
 }

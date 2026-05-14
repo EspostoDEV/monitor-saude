@@ -111,7 +111,7 @@ class EpidemicDashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonCount(5);
         $response->assertJsonStructure([
-            '*' => ['week', 'year', 'cases', 'level', 'incidence']
+            '*' => ['week', 'year', 'cases', 'level', 'incidence'],
         ]);
     }
 }

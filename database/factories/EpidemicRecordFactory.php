@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\EpidemicRecord;
 use App\Models\City;
+use App\Models\EpidemicRecord;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class EpidemicRecordFactory extends Factory

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EpidemicRecord extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'city_id',
         'disease_type',
@@ -27,7 +28,7 @@ class EpidemicRecord extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return match($this->level) {
+        return match ($this->level) {
             4 => 'Crítico',
             3 => 'Alerta',
             2 => 'Amarelo',

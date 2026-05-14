@@ -2,15 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\SyncHealthDataJob;
 use App\Models\City;
 use App\Models\SyncSession;
-use App\Jobs\SyncHealthDataJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
 class SyncEpidemicData extends Command
 {
     protected $signature = 'sync:epidemic-data {--disease=dengue} {--uf=}';
+
     protected $description = 'Sync epidemiological data using UF-based parallelization';
 
     public function handle()
@@ -25,9 +26,10 @@ class SyncEpidemicData extends Command
         }
 
         $totalCities = $query->count();
-        
+
         if ($totalCities === 0) {
-            $this->error("No cities found for the specified filters.");
+            $this->error('No cities found for the specified filters.');
+
             return 1;
         }
 
@@ -48,7 +50,7 @@ class SyncEpidemicData extends Command
             foreach ($ufs as $targetUf) {
                 SyncHealthDataJob::dispatch($disease, null, $targetUf, $sessionId);
             }
-            $this->info("Dispatched parallel jobs for " . $ufs->count() . " UFs.");
+            $this->info('Dispatched parallel jobs for '.$ufs->count().' UFs.');
         }
 
         $this->info("Session ID: {$sessionId}");

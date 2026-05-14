@@ -3,7 +3,6 @@
 namespace Tests\Unit;
 
 use App\Services\TrendAnalysisService;
-use Illuminate\Support\Collection;
 use PHPUnit\Framework\TestCase;
 
 class TrendAnalysisServiceTest extends TestCase
@@ -13,7 +12,7 @@ class TrendAnalysisServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TrendAnalysisService();
+        $this->service = new TrendAnalysisService;
     }
 
     public function test_it_returns_up_when_moving_average_increases_more_than_15_percent()
@@ -25,7 +24,7 @@ class TrendAnalysisServiceTest extends TestCase
         $records = collect([
             ['cases' => 12], ['cases' => 12], ['cases' => 12],
             ['cases' => 10], ['cases' => 10], ['cases' => 10],
-        ])->map(fn($item) => (object) $item);
+        ])->map(fn ($item) => (object) $item);
 
         $this->assertEquals('up', $this->service->calculateTrendFromRecords($records));
     }
@@ -37,7 +36,7 @@ class TrendAnalysisServiceTest extends TestCase
         $records = collect([
             ['cases' => 8], ['cases' => 8], ['cases' => 8],
             ['cases' => 10], ['cases' => 10], ['cases' => 10],
-        ])->map(fn($item) => (object) $item);
+        ])->map(fn ($item) => (object) $item);
 
         $this->assertEquals('down', $this->service->calculateTrendFromRecords($records));
     }
@@ -53,7 +52,7 @@ class TrendAnalysisServiceTest extends TestCase
             ['cases' => 10],
             ['cases' => 10],
             ['cases' => 10],
-        ])->map(fn($item) => (object) $item);
+        ])->map(fn ($item) => (object) $item);
 
         $this->assertEquals('down', $this->service->calculateTrendFromRecords($records));
     }
@@ -63,7 +62,7 @@ class TrendAnalysisServiceTest extends TestCase
         $records = collect([
             ['cases' => 11], ['cases' => 11], ['cases' => 11],
             ['cases' => 10], ['cases' => 10], ['cases' => 10],
-        ])->map(fn($item) => (object) $item);
+        ])->map(fn ($item) => (object) $item);
 
         $this->assertEquals('stable', $this->service->calculateTrendFromRecords($records));
     }
@@ -72,7 +71,7 @@ class TrendAnalysisServiceTest extends TestCase
     {
         $records = collect([
             ['cases' => 10], ['cases' => 10],
-        ])->map(fn($item) => (object) $item);
+        ])->map(fn ($item) => (object) $item);
 
         $this->assertEquals('stable', $this->service->calculateTrendFromRecords($records));
     }

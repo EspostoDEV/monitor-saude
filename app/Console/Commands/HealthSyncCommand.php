@@ -31,17 +31,18 @@ class HealthSyncCommand extends Command
         $disease = $this->argument('disease');
         $ibgeCode = $this->option('ibge');
 
-        if (!in_array($disease, ['dengue', 'chikungunya', 'zika'])) {
-            $this->error("Doença inválida. Use: dengue, chikungunya ou zika.");
+        if (! in_array($disease, ['dengue', 'chikungunya', 'zika'])) {
+            $this->error('Doença inválida. Use: dengue, chikungunya ou zika.');
+
             return 1;
         }
 
-        $this->info("Iniciando sincronização de {$disease}" . ($ibgeCode ? " para o município {$ibgeCode}..." : "..."));
+        $this->info("Iniciando sincronização de {$disease}".($ibgeCode ? " para o município {$ibgeCode}..." : '...'));
 
-        $count = $service->sync($disease, $ibgeCode ? (int)$ibgeCode : null);
+        $count = $service->sync($disease, $ibgeCode ? (int) $ibgeCode : null);
 
         $this->success("Sincronização concluída! {$count} registros processados.");
-        
+
         return 0;
     }
 

@@ -12,13 +12,8 @@ class InfoDengueService
     /**
      * Fetch epidemic data for a specific city and disease.
      *
-     * @param int $ibgeCode 7-digit IBGE code
-     * @param string $disease dengue, zika, or chikungunya
-     * @param int|null $yearStart
-     * @param int|null $weekStart
-     * @param int|null $yearEnd
-     * @param int|null $weekEnd
-     * @return array
+     * @param  int  $ibgeCode  7-digit IBGE code
+     * @param  string  $disease  dengue, zika, or chikungunya
      */
     public function fetch(
         int $ibgeCode,
@@ -46,13 +41,15 @@ class InfoDengueService
                 ]);
 
             if ($response->failed()) {
-                Log::error("InfoDengue API failed for city {$ibgeCode}: " . $response->body());
+                Log::error("InfoDengue API failed for city {$ibgeCode}: ".$response->body());
+
                 return [];
             }
 
             return $response->json() ?? [];
         } catch (\Exception $e) {
-            Log::error("Error fetching InfoDengue data: " . $e->getMessage());
+            Log::error('Error fetching InfoDengue data: '.$e->getMessage());
+
             return [];
         }
     }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
@@ -15,8 +16,8 @@ class InfoGripeService
     public function fetch(int $ibgeCode, string $disease = 'srag'): array
     {
         $host = self::HOSTS[$disease] ?? self::HOSTS['srag'];
-        $path = ($disease === 'srag') ? "/api/v1/dashboard/alertcity" : "/api/v1/alertcity";
-        
+        $path = ($disease === 'srag') ? '/api/v1/dashboard/alertcity' : '/api/v1/alertcity';
+
         $year = now()->year;
 
         $response = Http::withOptions(['verify' => true]) // SSL Habilitado (PRD Compliance)

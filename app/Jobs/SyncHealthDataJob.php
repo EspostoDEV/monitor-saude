@@ -36,8 +36,11 @@ class SyncHealthDataJob implements ShouldQueue
     public $timeout = 3600; // 1 hora
 
     public string $disease;
+
     public ?int $ibgeCode = null;
+
     public ?string $uf = null;
+
     public ?string $sessionId = null;
 
     /**
@@ -57,13 +60,13 @@ class SyncHealthDataJob implements ShouldQueue
     public function handle(HealthDataService $service): void
     {
         Log::info("JOB DEBUG: Iniciando Handle. Doença: {$this->disease}, UF: {$this->uf}, Session: {$this->sessionId}");
-        
-        if (!$this->sessionId) {
-            Log::warning("JOB WARNING: SessionId está vazio!");
+
+        if (! $this->sessionId) {
+            Log::warning('JOB WARNING: SessionId está vazio!');
         }
 
         $count = $service->sync($this->disease, $this->ibgeCode, $this->uf, $this->sessionId);
-        
+
         Log::info("Job de sincronização concluído: {$this->disease}. {$count} registros processados.");
     }
 
@@ -72,6 +75,6 @@ class SyncHealthDataJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error("Job de sincronização falhou para {$this->disease}: " . $exception->getMessage());
+        Log::error("Job de sincronização falhou para {$this->disease}: ".$exception->getMessage());
     }
 }

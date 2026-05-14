@@ -27,7 +27,7 @@ class HealthDataSyncTest extends TestCase
         // GIVEN
         $city = City::factory()->create([
             'ibge_code' => 3550308, // São Paulo
-            'name' => 'São Paulo'
+            'name' => 'São Paulo',
         ]);
 
         $mockResponse = [
@@ -37,12 +37,12 @@ class HealthDataSyncTest extends TestCase
                 'casos' => 150,
                 'incidencia' => 350.5,
                 'pop' => 12000000,
-            ]
+            ],
         ];
 
         // Restringindo o mock para evitar falsos positivos
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200)
+            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200),
         ]);
 
         // WHEN
@@ -66,7 +66,7 @@ class HealthDataSyncTest extends TestCase
         $city = City::factory()->create();
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response([], 500)
+            'https://info.dengue.mat.br/api/alert/*' => Http::response([], 500),
         ]);
 
         // WHEN
@@ -81,14 +81,14 @@ class HealthDataSyncTest extends TestCase
     {
         // GIVEN
         $city = City::factory()->create(['ibge_code' => 1234567]);
-        
+
         // Record already exists
         EpidemicRecord::factory()->create([
             'city_id' => $city->id,
             'disease_type' => 'dengue',
             'epi_week' => 10,
             'year' => 2026,
-            'cases' => 100
+            'cases' => 100,
         ]);
 
         $mockResponse = [
@@ -97,11 +97,11 @@ class HealthDataSyncTest extends TestCase
                 'epi_year' => 2026,
                 'casos' => 200,
                 'incidencia' => 400.0,
-            ]
+            ],
         ];
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200)
+            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200),
         ]);
 
         // WHEN
@@ -111,7 +111,7 @@ class HealthDataSyncTest extends TestCase
         $this->assertDatabaseCount('epidemic_records', 1);
         $this->assertDatabaseHas('epidemic_records', [
             'city_id' => $city->id,
-            'cases' => 200
+            'cases' => 200,
         ]);
     }
 
@@ -128,7 +128,7 @@ class HealthDataSyncTest extends TestCase
         ]);
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response([['epi_week' => 1, 'epi_year' => 2026, 'casos' => 10]], 200)
+            'https://info.dengue.mat.br/api/alert/*' => Http::response([['epi_week' => 1, 'epi_year' => 2026, 'casos' => 10]], 200),
         ]);
 
         // WHEN
