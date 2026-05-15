@@ -1,1 +1,20 @@
+#!/bin/sh
+# Força o uso do WSL se chamado a partir de um ambiente Windows (ex: Git Bash)
+if [ "$(uname)" != "Linux" ]; then
+  wsl sh .husky/pre-commit "$@"
+  exit $?
+fi
+
+# Carrega o NVM para garantir que o node/npm do Linux estejam no PATH
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Shim para PHP: permite que o pint use o php.exe do Windows/Herd se o PHP nativo não estiver no WSL
+if ! command -v php >/dev/null 2>&1 && command -v php.exe >/dev/null 2>&1; then
+  mkdir -p .husky/_/bin
+  ln -sf "$(which php.exe)" .husky/_/bin/php
+  export PATH="$PWD/.husky/_/bin:$PATH"
+fi
+
+# Executa o lint-staged via npx
 npx lint-staged
