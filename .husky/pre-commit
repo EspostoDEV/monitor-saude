@@ -5,16 +5,21 @@ if [ "$(uname)" != "Linux" ]; then
   exit $?
 fi
 
-# Carrega o NVM para garantir que o node/npm do Linux estejam no PATH
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# Se o Laravel Sail estiver ativo, executamos o linting dentro do container
+# para garantir consistência total com o ambiente de execução.
+if ./vendor/bin/sail ps > /dev/null 2>&1; then
+  ./vendor/bin/sail npx lint-staged
+else
+  # Fallback: Se o Sail estiver desligado, usa o Node/NVM instalado no WSL.
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  
+  # Shim para PHP (usando php.exe do Herd se necessário no fallback)
+  if ! command -v php >/dev/null 2>&1 && command -v php.exe >/dev/null 2>&1; then
+    mkdir -p .husky/_/bin
+    ln -sf "$(which php.exe)" .husky/_/bin/php
+    export PATH="$PWD/.husky/_/bin:$PATH"
+  fi
 
-# Shim para PHP: permite que o pint use o php.exe do Windows/Herd se o PHP nativo não estiver no WSL
-if ! command -v php >/dev/null 2>&1 && command -v php.exe >/dev/null 2>&1; then
-  mkdir -p .husky/_/bin
-  ln -sf "$(which php.exe)" .husky/_/bin/php
-  export PATH="$PWD/.husky/_/bin:$PATH"
+  npx lint-staged
 fi
-
-# Executa o lint-staged via npx
-npx lint-staged
