@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\EpidemicRecordResource;
 use App\Models\EpidemicRecord;
+use App\Repositories\Contracts\EpidemicRepositoryInterface;
 use App\Services\RiskEngineService;
 use App\Services\TrendAnalysisService;
 use Illuminate\Http\JsonResponse;
@@ -13,14 +14,18 @@ use Inertia\Response;
 
 class EpidemicController extends Controller
 {
-    protected TrendAnalysisService $trendService;
-
     protected RiskEngineService $riskService;
 
-    public function __construct(TrendAnalysisService $trendService, RiskEngineService $riskService)
-    {
+    protected EpidemicRepositoryInterface $repository;
+
+    public function __construct(
+        TrendAnalysisService $trendService,
+        RiskEngineService $riskService,
+        EpidemicRepositoryInterface $repository
+    ) {
         $this->trendService = $trendService;
         $this->riskService = $riskService;
+        $this->repository = $repository;
     }
 
     public function index(Request $request): Response
@@ -35,41 +40,14 @@ class EpidemicController extends Controller
         $year = $request->year ?? EpidemicRecord::where('disease_type', $disease)->max('year') ?? 2024;
         $uf = $request->uf;
 
-        // 1. Resolvemos a última semana e última sincronização (Global para o contexto de ano/doença)
-        $latestWeek = EpidemicRecord::where('year', $year)->where('disease_type', $disease)->max('epi_week');
-        $lastSync = EpidemicRecord::where('disease_type', $disease)->max('updated_at');
+        // 1. Resolvemos a última semana e última sincronização via Repositório
+        $latestWeek = $this->repository->getLatestWeek($year, $disease);
+        $lastSync = $this->repository->getLastSyncAt($disease);
 
         if ($uf) {
-            // Otimização Arquitetural (Winston Plan): Totais da UF e registros em um único fluxo
-            $records = \Cache::remember("epi_intel_{$uf}_{$year}_{$disease}", 600, function () use ($uf, $year, $disease, $latestWeek) {
-                // Subquery para totais acumulados por cidade
-                $totalsSubquery = EpidemicRecord::query()
-                    ->select('city_id', \DB::raw('SUM(cases) as total_cases'))
-                    ->where('year', $year)
-                    ->where('disease_type', $disease)
-                    ->groupBy('city_id');
-
-                $query = EpidemicRecord::query()
-                    ->deduplicated(['epidemic_records.city_id'])
-                    ->selectRaw('COALESCE(totals.total_cases, 0) as total_cases')
-                    // Injeção de Stats Globais da UF via Subqueries para evitar Queries N+1
-                    ->selectRaw('(SELECT SUM(cases) FROM epidemic_records e2 JOIN cities c2 ON c2.id = e2.city_id WHERE c2.uf = ? AND e2.year = ? AND e2.disease_type = ?) as uf_total_cases', [$uf, $year, $disease])
-                    ->selectRaw('(SELECT SUM(cases) FROM epidemic_records e3 JOIN cities c3 ON c3.id = e3.city_id WHERE c3.uf = ? AND e3.year = ? AND e3.disease_type = ? AND e3.epi_week = ?) as uf_new_cases', [$uf, $year, $disease, $latestWeek])
-                    ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
-                    ->leftJoinSub($totalsSubquery, 'totals', 'totals.city_id', '=', 'epidemic_records.city_id')
-                    ->with('city')
-                    ->where('cities.uf', $uf)
-                    ->where('year', $year)
-                    ->where('disease_type', $disease);
-
-                if (\DB::getDriverName() === 'pgsql') {
-                    $query->selectRaw('ST_X(cities.location::geometry) as lng, ST_Y(cities.location::geometry) as lat');
-                } else {
-                    // Fallback para SQLite/Ambiente de testes (Simula coordenadas nulas ou parseia o texto se necessário)
-                    $query->selectRaw('NULL as lng, NULL as lat');
-                }
-
-                $data = $query->get();
+            $records = \Cache::remember("epi_intel_{$uf}_{$year}_{$disease}_w{$latestWeek}", 600, function () use ($uf, $year, $disease, $latestWeek) {
+                $data = $this->repository->getLatestRecordsByUf($uf, $year, $disease, $latestWeek);
+                $ufStats = $this->repository->getUfGlobalStats($uf, $year, $disease, $latestWeek);
 
                 foreach ($data as $record) {
                     $record->trend = $this->trendService->calculateTrend($record->city, $disease);
@@ -78,8 +56,8 @@ class EpidemicController extends Controller
 
                 return [
                     'records' => EpidemicRecordResource::collection($data)->resolve(),
-                    'uf_total_cases' => (int) ($data->first()->uf_total_cases ?? 0),
-                    'uf_new_cases' => (int) ($data->first()->uf_new_cases ?? 0),
+                    'uf_total_cases' => $ufStats['uf_total_cases'],
+                    'uf_new_cases' => $ufStats['uf_new_cases'],
                 ];
             });
 
@@ -92,14 +70,8 @@ class EpidemicController extends Controller
             $records = $records['records'];
         } else {
             // Visão Nacional - Via Materialized View
-            $records = \Cache::remember("epi_intel_national_{$year}_{$disease}", 600, function () use ($year, $disease, $latestWeek) {
-                return \DB::table('mv_uf_epidemic_stats')
-                    ->select('uf', 'total_cases', 'real_incidence as incidence')
-                    ->selectRaw('total_cases as new_cases')
-                    ->where('year', $year)
-                    ->where('epi_week', $latestWeek)
-                    ->where('disease_type', $disease)
-                    ->get()
+            $records = \Cache::remember("epi_intel_national_{$year}_{$disease}_w{$latestWeek}", 600, function () use ($year, $disease, $latestWeek) {
+                return $this->repository->getNationalStats($year, $disease, $latestWeek)
                     ->map(function ($item) use ($disease) {
                         $trend = $this->trendService->calculateTrendForUf($item->uf, $disease);
                         $level = $this->riskService->getAlertLevel($item->incidence, (int) $item->new_cases, $trend);

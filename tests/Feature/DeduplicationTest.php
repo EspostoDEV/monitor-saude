@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\City;
-use App\Models\EpidemicRecord;
+use App\Repositories\Contracts\EpidemicRepositoryInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -47,8 +47,9 @@ class DeduplicationTest extends TestCase
             'created_at' => now(),
         ]);
 
-        // 4. Executar a query com o scope deduplicated
-        $results = EpidemicRecord::deduplicated()->get();
+        // 4. Executar a query através do repositório
+        $repository = app(EpidemicRepositoryInterface::class);
+        $results = $repository->getHistoryForTrend($city->id, 'dengue');
 
         // 5. Asserções
         $this->assertCount(1, $results, 'Deveria retornar apenas 1 registro para o par (cidade, semana)');

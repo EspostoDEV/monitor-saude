@@ -4,24 +4,25 @@ namespace App\Services;
 
 use App\Models\City;
 use App\Models\EpidemicRecord;
+use App\Repositories\Contracts\EpidemicRepositoryInterface;
 use Illuminate\Support\Collection;
 
 class TrendAnalysisService
 {
+    protected EpidemicRepositoryInterface $repository;
+
+    public function __construct(EpidemicRepositoryInterface $repository)
+    {
+        $this->repository = $repository;
+    }
+
     /**
      * Calculates the trend for a specific city and disease.
      * Uses the database to fetch records.
      */
     public function calculateTrend(City $city, string $disease): string
     {
-        $records = EpidemicRecord::query()
-            ->deduplicated(['year', 'epi_week'])
-            ->where('city_id', $city->id)
-            ->where('disease_type', $disease)
-            ->orderBy('year', 'desc')
-            ->orderBy('epi_week', 'desc')
-            ->limit(12) // Aumentamos o limite para garantir 8 semanas úteis
-            ->get();
+        $records = $this->repository->getHistoryForTrend($city->id, $disease);
 
         return $this->calculateTrendFromRecords($records);
     }
@@ -37,17 +38,8 @@ class TrendAnalysisService
             return 'stable';
         }
 
-        $deduplicatedSubquery = EpidemicRecord::query()
-            ->deduplicated(['city_id', 'year', 'epi_week'])
-            ->where('disease_type', $disease);
-
-        // Captura o número de cidades que contribuíram para a semana mais recente
-        $latestRecord = EpidemicRecord::where('disease_type', $disease)
-            ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
-            ->where('cities.uf', $uf)
-            ->orderBy('year', 'desc')
-            ->orderBy('epi_week', 'desc')
-            ->first();
+        // Captura o número de cidades que contribuíram para a semana mais recente via Repositório
+        $latestRecord = $this->repository->getLatestRecordForUf($uf, $disease);
 
         if ($latestRecord) {
             $syncedCitiesCount = EpidemicRecord::where('disease_type', $disease)
@@ -66,16 +58,7 @@ class TrendAnalysisService
             return 'uncertain';
         }
 
-        $records = \DB::table(\DB::raw("({$deduplicatedSubquery->toSql()}) as records"))
-            ->mergeBindings($deduplicatedSubquery->getQuery())
-            ->selectRaw('year, epi_week, SUM(cases) as cases')
-            ->join('cities', 'cities.id', '=', 'records.city_id')
-            ->where('cities.uf', $uf)
-            ->groupBy('year', 'epi_week')
-            ->orderBy('year', 'desc')
-            ->orderBy('epi_week', 'desc')
-            ->limit(12)
-            ->get();
+        $records = $this->repository->getUfHistoryForTrend($uf, $disease);
 
         return $this->calculateTrendFromRecords($records);
     }

@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Repositories\Contracts\EpidemicRepositoryInterface;
 use App\Services\TrendAnalysisService;
 use PHPUnit\Framework\TestCase;
 
@@ -12,7 +13,8 @@ class TrendAnalysisServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TrendAnalysisService;
+        $repository = $this->createMock(EpidemicRepositoryInterface::class);
+        $this->service = new TrendAnalysisService($repository);
     }
 
     public function test_it_returns_up_when_moving_average_increases_more_than_15_percent()
