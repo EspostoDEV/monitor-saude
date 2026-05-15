@@ -22,7 +22,7 @@ class DeduplicationTest extends TestCase
             'ibge_code' => 3304557,
             'name' => 'Rio de Janeiro',
             'uf' => 'RJ',
-            'location' => DB::getDriverName() === 'pgsql' ? DB::raw("ST_GeogFromText('POINT(-43.1729 -22.9068)')") : 'POINT(-43.1729 -22.9068)',
+            'location' => DB::getDriverName() === 'pgsql' ? DB::raw("ST_GeomFromText('POINT(-43.1729 -22.9068)', 4326)") : 'POINT(-43.1729 -22.9068)',
         ]);
 
         // 2. Criar registro antigo para a Semana 10

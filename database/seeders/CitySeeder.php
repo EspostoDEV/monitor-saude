@@ -41,7 +41,7 @@ class CitySeeder extends Seeder
                     'ibge_code' => $ibgeCode,
                     'name' => $city['nome'],
                     'uf' => $this->getUF($city['codigo_uf']),
-                    'location' => DB::getDriverName() === 'pgsql' ? DB::raw("ST_GeogFromText('POINT($lng $lat)')") : "POINT($lng $lat)",
+                    'location' => DB::getDriverName() === 'pgsql' ? DB::raw("ST_GeomFromText('POINT($lng $lat)', 4326)") : "POINT($lng $lat)",
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];

@@ -47,10 +47,11 @@ class EpidemicRecordResource extends JsonResource
             'total_cases' => (int) $this->total_cases,
             'city' => [
                 'id' => $this->city_id,
+                'ibge_code' => $this->city->ibge_code,
                 'name' => $this->city->name,
                 'uf' => $this->city->uf,
-                'lat' => $this->lat,
-                'lng' => $this->lng,
+                'lat' => $this->city->lat,
+                'lng' => $this->city->lng,
             ],
             'trend' => $this->trend ?? 'stable',
             'alert_explanation' => $this->when(isset($this->alert_explanation), $this->alert_explanation),
