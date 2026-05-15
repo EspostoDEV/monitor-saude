@@ -54,7 +54,7 @@ class HealthDataService
 
         // Mapeamento de doenças para endpoints específicos
         $isArbo = in_array($disease, ['dengue', 'zika', 'chikungunya']);
-        $url = $isArbo 
+        $url = $isArbo
             ? 'https://info.dengue.mat.br/api/alertcity'
             : 'https://infogripe.fiocruz.br/api/v1/dashboard/alertcity';
 
