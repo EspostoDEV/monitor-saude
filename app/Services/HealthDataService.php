@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\City;
 use App\Models\EpidemicRecord;
+use App\Models\SyncSession;
 use Carbon\Carbon;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -15,13 +16,22 @@ class HealthDataService
 
     protected InfoGripeService $gripeService;
 
-    public function __construct(InfoDengueService $dengueService, InfoGripeService $gripeService)
-    {
+    protected RiskEngineService $riskService;
+
+    public function __construct(
+        InfoDengueService $dengueService,
+        InfoGripeService $gripeService,
+        RiskEngineService $riskService
+    ) {
         $this->dengueService = $dengueService;
         $this->gripeService = $gripeService;
+        $this->riskService = $riskService;
     }
 
-    public function sync(string $disease, ?int $ibgeCode = null, ?string $uf = null): array
+    /**
+     * Sincroniza dados epidemiológicos.
+     */
+    public function sync(string $disease, ?int $ibgeCode = null, ?string $uf = null, ?string $sessionId = null): int
     {
         $service = $this->getService($disease);
         $query = City::query();
@@ -35,11 +45,9 @@ class HealthDataService
         }
 
         $cities = $query->get();
-        $chunks = $cities->chunk(10);
         $totalRecords = 0;
-        $maxUpdatedAt = null;
 
-        foreach ($chunks as $chunk) {
+        foreach ($cities->chunk(10) as $chunk) {
             $responses = Http::pool(fn ($pool) => $chunk->map(
                 fn ($city) => $pool->as($city->ibge_code)
                     ->withOptions(['verify' => true])
@@ -58,23 +66,22 @@ class HealthDataService
                 $response = $responses[$city->ibge_code];
 
                 if ($response instanceof Response && $response->successful()) {
-                    $data = $response->json();
-                    $recordsSaved = $this->persistData($city, $disease, $data);
-                    $totalRecords += $recordsSaved;
-
-                    if ($recordsSaved > 0) {
-                        $maxUpdatedAt = now();
-                    }
+                    $totalRecords += $this->persistData($city, $disease, $response->json());
                 } else {
                     Log::error("Falha ao sincronizar cidade {$city->ibge_code}: ".($response?->body() ?? 'No response'));
                 }
             }
+
+            if ($sessionId) {
+                $this->updateSessionProgress($sessionId, $chunk->count());
+            }
         }
 
-        return [
-            'records_saved' => $totalRecords,
-            'last_sync_at' => $maxUpdatedAt,
-        ];
+        if ($sessionId) {
+            $this->finalizeSession($sessionId);
+        }
+
+        return $totalRecords;
     }
 
     protected function getService(string $disease): object
@@ -87,29 +94,36 @@ class HealthDataService
         $count = 0;
 
         foreach ($data as $record) {
-            // Safety Guard: Ignora registros malformados ou incompletos
-            if (! isset($record['year']) || ! isset($record['epi_week'])) {
+            $year = $record['year'] ?? $record['epi_year'] ?? null;
+            $week = $record['epi_week'] ?? null;
+
+            if (! $year || ! $week) {
                 continue;
             }
 
             $currentCases = (int) ($record['casos'] ?? 0);
 
-            // Freshness Tracking: Captura a versão do modelo ou data de atualização da Fiocruz
-            $updatedAt = isset($record['versao_modelo'])
-                ? Carbon::parse($record['versao_modelo'])
-                : now();
+            // População vem da API (campo 'pop'). Fallback para 1 para evitar divisão por zero.
+            $population = (int) ($record['pop'] ?? 1);
+
+            $incidence = ($currentCases / $population) * 100000;
+            $updatedAt = isset($record['versao_modelo']) ? Carbon::parse($record['versao_modelo']) : now();
+
+            // Calcula o nível básico para a tabela base
+            $level = $this->riskService->getAlertLevel($incidence, $currentCases, 'stable');
 
             EpidemicRecord::updateOrCreate(
                 [
                     'city_id' => $city->id,
-                    'year' => $record['year'],
-                    'epi_week' => $record['epi_week'],
+                    'year' => $year,
+                    'epi_week' => $week,
                     'disease_type' => $disease,
                 ],
                 [
                     'cases' => $currentCases,
-                    'population' => $city->population,
-                    'incidence' => ($currentCases / max($city->population, 1)) * 100000,
+                    'population' => $population,
+                    'incidence' => $incidence,
+                    'level' => $level,
                     'updated_at' => $updatedAt,
                 ]
             );
@@ -117,5 +131,18 @@ class HealthDataService
         }
 
         return $count;
+    }
+
+    protected function updateSessionProgress(string $sessionId, int $processedCount): void
+    {
+        SyncSession::where('session_id', $sessionId)->increment('processed_cities', $processedCount);
+    }
+
+    protected function finalizeSession(string $sessionId): void
+    {
+        SyncSession::where('session_id', $sessionId)->update([
+            'status' => 'finished',
+            'completed_at' => now(),
+        ]);
     }
 }

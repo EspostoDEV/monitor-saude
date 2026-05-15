@@ -17,21 +17,21 @@ class PostgisEpidemicRepository implements EpidemicRepositoryInterface
 
         // Filter Push-down: Aplicando o filtro de UF dentro da subquery do DISTINCT ON
         $subquery = '
-            SELECT DISTINCT ON (city_id) id 
+            SELECT DISTINCT ON (epidemic_records.city_id) epidemic_records.id 
             FROM epidemic_records 
             JOIN cities ON cities.id = epidemic_records.city_id
             WHERE cities.uf = ? AND epidemic_records.year = ? AND epidemic_records.disease_type = ? 
-            ORDER BY city_id, updated_at DESC
+            ORDER BY epidemic_records.city_id, epidemic_records.updated_at DESC
         ';
 
         // Elite Optimization: Filtrando também os totais anuais pelo UF solicitado
         $totalsSubquery = EpidemicRecord::query()
-            ->select('city_id', DB::raw('SUM(cases) as total_cases'))
+            ->select('epidemic_records.city_id', DB::raw('SUM(epidemic_records.cases) as total_cases'))
             ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
             ->where('cities.uf', $uf)
             ->where('epidemic_records.year', $year)
             ->where('epidemic_records.disease_type', $disease)
-            ->groupBy('city_id');
+            ->groupBy('epidemic_records.city_id');
 
         return EpidemicRecord::query()
             ->select('epidemic_records.*')
@@ -115,13 +115,14 @@ class PostgisEpidemicRepository implements EpidemicRepositoryInterface
 
     public function getUfHistoryForTrend(string $uf, string $disease, int $limit = 12): Collection
     {
-        // Filter Push-down aplicado também na tendência por UF
+        // Simplificação: Selecionando apenas as colunas necessárias para evitar ambiguidade e sobrecarga
         $deduplicatedSubquery = '
-            SELECT DISTINCT ON (city_id, year, epi_week) * 
+            SELECT DISTINCT ON (epidemic_records.city_id, epidemic_records.year, epidemic_records.epi_week) 
+                epidemic_records.year, epidemic_records.epi_week, epidemic_records.cases
             FROM epidemic_records 
             JOIN cities ON cities.id = epidemic_records.city_id
-            WHERE cities.uf = ? AND disease_type = ? 
-            ORDER BY city_id, year DESC, epi_week DESC, updated_at DESC
+            WHERE cities.uf = ? AND epidemic_records.disease_type = ? 
+            ORDER BY epidemic_records.city_id, epidemic_records.year DESC, epidemic_records.epi_week DESC, epidemic_records.updated_at DESC
         ';
 
         return DB::table(DB::raw("($deduplicatedSubquery) as records"))

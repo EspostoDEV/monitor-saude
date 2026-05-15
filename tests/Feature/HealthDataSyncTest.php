@@ -36,7 +36,7 @@ class HealthDataSyncTest extends TestCase
                 'epi_year' => 2026,
                 'casos' => 150,
                 'incidencia' => 350.5,
-                'pop' => 12000000,
+                'pop' => 42796, // Definindo a população aqui para que a incidência calculada seja ~350
             ],
         ];
 
@@ -89,6 +89,7 @@ class HealthDataSyncTest extends TestCase
             'epi_week' => 10,
             'year' => 2026,
             'cases' => 100,
+            'level' => 2,
         ]);
 
         $mockResponse = [
@@ -96,7 +97,8 @@ class HealthDataSyncTest extends TestCase
                 'epi_week' => 10,
                 'epi_year' => 2026,
                 'casos' => 200,
-                'incidencia' => 400.0,
+                'pop' => 42796,
+                'incidencia' => 467.0,
             ],
         ];
 
@@ -112,6 +114,7 @@ class HealthDataSyncTest extends TestCase
         $this->assertDatabaseHas('epidemic_records', [
             'city_id' => $city->id,
             'cases' => 200,
+            'level' => 3, // 200 / 42796 * 100k = 467 (Nível 3)
         ]);
     }
 
@@ -138,6 +141,6 @@ class HealthDataSyncTest extends TestCase
         $session->refresh();
         $this->assertEquals(1, $session->processed_cities);
         $this->assertEquals('finished', $session->status);
-        $this->assertNotNull($session->completed_at); // Adicionado conforme revisão
+        $this->assertNotNull($session->completed_at);
     }
 }
