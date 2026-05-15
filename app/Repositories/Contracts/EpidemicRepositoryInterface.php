@@ -9,13 +9,11 @@ interface EpidemicRepositoryInterface
 {
     /**
      * Get the latest records for a given UF, including spatial coordinates.
-     * This method handles the complexity of DISTINCT ON (Postgres) vs GROUP BY (SQLite)
-     * and spatial data extraction (ST_X/ST_Y).
      */
-    public function getLatestRecordsByUf(string $uf, int $year, string $disease, int $latestWeek): Collection;
+    public function getLatestRecordsByUf(string $uf, int $year, string $disease, ?int $latestWeek): Collection;
 
     /**
-     * Get national statistics from the summary view (Materialized View or standard View).
+     * Get national statistics from the summary view.
      */
     public function getNationalStats(int $year, string $disease, ?int $latestWeek): Collection;
 
@@ -32,7 +30,7 @@ interface EpidemicRepositoryInterface
     /**
      * Get global stats for a UF (Total and New Cases).
      */
-    public function getUfGlobalStats(string $uf, int $year, string $disease, int $latestWeek): array;
+    public function getUfGlobalStats(string $uf, int $year, string $disease, ?int $latestWeek): array;
 
     /**
      * Get history for trend analysis of a city.

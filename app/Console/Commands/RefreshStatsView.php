@@ -5,9 +5,11 @@ namespace App\Console\Commands;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 #[Signature('app:refresh-stats-view')]
-#[Description('Refresh the mv_uf_epidemic_stats materialized view concurrently')]
+#[Description('Refresh all analytical materialized views (UF and National)')]
 class RefreshStatsView extends Command
 {
     /**
@@ -15,10 +17,10 @@ class RefreshStatsView extends Command
      */
     public function handle()
     {
-        $driver = \DB::getDriverName();
+        $driver = DB::getDriverName();
 
         if ($driver === 'sqlite') {
-            $this->warn('Skipping refresh for SQLite (using standard view).');
+            $this->warn('Skipping refresh for SQLite (using standard views).');
 
             return 0;
         }
@@ -29,33 +31,38 @@ class RefreshStatsView extends Command
             return 1;
         }
 
-        $this->info('Refreshing Materialized View (CONCURRENTLY)...');
+        $views = [
+            'mv_uf_epidemic_stats',
+            'mv_national_stats',
+        ];
 
-        try {
-            \DB::statement('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_uf_epidemic_stats');
-            $this->info('Materialized View refreshed successfully (CONCURRENTLY)!');
+        foreach ($views as $view) {
+            $this->info("Refreshing Materialized View: {$view} (CONCURRENTLY)...");
 
-            return 0;
-        } catch (\Throwable $e) {
-            if (str_contains(strtolower($e->getMessage()), 'concurrently')) {
-                $this->warn('Concurrent refresh failed, attempting standard refresh...');
-                try {
-                    \DB::statement('REFRESH MATERIALIZED VIEW mv_uf_epidemic_stats');
-                    $this->info('Materialized View refreshed successfully (Standard)!');
+            try {
+                DB::statement("REFRESH MATERIALIZED VIEW CONCURRENTLY {$view}");
+                $this->info("View {$view} refreshed successfully (CONCURRENTLY)!");
+            } catch (\Throwable $e) {
+                if (str_contains(strtolower($e->getMessage()), 'concurrently')) {
+                    $this->warn("Concurrent refresh failed for {$view}, attempting standard refresh...");
+                    try {
+                        DB::statement("REFRESH MATERIALIZED VIEW {$view}");
+                        $this->info("View {$view} refreshed successfully (Standard)!");
+                    } catch (\Throwable $e2) {
+                        $this->error("Failed to refresh View {$view} (Standard): ".$e2->getMessage());
+                        Log::error("Materialized View Refresh Failed: {$view}", ['exception' => $e2]);
 
-                    return 0;
-                } catch (\Throwable $e2) {
-                    $this->error('Failed to refresh Materialized View (Standard): '.$e2->getMessage());
-                    \Log::error('Materialized View Refresh Failed (Standard)', ['exception' => $e2]);
+                        return 1;
+                    }
+                } else {
+                    $this->error("Failed to refresh View {$view}: ".$e->getMessage());
+                    Log::error("Materialized View Refresh Failed: {$view}", ['exception' => $e]);
 
                     return 1;
                 }
             }
-
-            $this->error('Failed to refresh Materialized View: '.$e->getMessage());
-            \Log::error('Materialized View Refresh Failed', ['exception' => $e]);
-
-            return 1;
         }
+
+        return 0;
     }
 }

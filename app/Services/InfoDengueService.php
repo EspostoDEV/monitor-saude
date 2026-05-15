@@ -9,11 +9,18 @@ class InfoDengueService
 {
     private const BASE_URL = 'https://info.dengue.mat.br/api/alertcity';
 
+    public function getUrl(): string
+    {
+        return self::BASE_URL;
+    }
+
+    public function getApiDiseaseName(string $disease): string
+    {
+        return $disease; // Dengue, Zika, Chikungunya usam o mesmo nome na API
+    }
+
     /**
      * Fetch epidemic data for a specific city and disease.
-     *
-     * @param  int  $ibgeCode  7-digit IBGE code
-     * @param  string  $disease  dengue, zika, or chikungunya
      */
     public function fetch(
         int $ibgeCode,
@@ -25,14 +32,17 @@ class InfoDengueService
     ): array {
         $yearStart = $yearStart ?? now()->year;
         $yearEnd = $yearEnd ?? now()->year;
-        $weekEnd = $weekEnd ?? 53; // Covers the whole year by default
+        $weekEnd = $weekEnd ?? 53;
 
         try {
-            $response = Http::timeout(30)
-                ->retry(3, 100)
-                ->get(self::BASE_URL, [
+            $response = Http::withOptions(['verify' => true])
+                ->timeout(30)
+                ->retry(3, function (int $attempt) {
+                    return (int) pow(2, $attempt - 1) * 100;
+                }, throw: false)
+                ->get($this->getUrl(), [
                     'geocode' => $ibgeCode,
-                    'disease' => $disease,
+                    'disease' => $this->getApiDiseaseName($disease),
                     'format' => 'json',
                     'ew_start' => $weekStart,
                     'ey_start' => $yearStart,

@@ -4,199 +4,118 @@ namespace App\Services;
 
 use App\Models\City;
 use App\Models\EpidemicRecord;
-use App\Models\SyncLog;
-use App\Models\SyncSession;
+use Carbon\Carbon;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class HealthDataService
 {
-    protected RiskEngineService $riskService;
+    protected InfoDengueService $dengueService;
 
-    public function __construct(RiskEngineService $riskService)
+    protected InfoGripeService $gripeService;
+
+    public function __construct(InfoDengueService $dengueService, InfoGripeService $gripeService)
     {
-        $this->riskService = $riskService;
+        $this->dengueService = $dengueService;
+        $this->gripeService = $gripeService;
     }
 
-    /**
-     * Sincroniza dados de uma doença para um município específico ou todos.
-     */
-    public function sync(string $disease, ?int $ibgeCode = null, ?string $uf = null, ?string $sessionId = null): int
+    public function sync(string $disease, ?int $ibgeCode = null, ?string $uf = null): array
     {
+        $service = $this->getService($disease);
         $query = City::query();
+
         if ($ibgeCode) {
             $query->where('ibge_code', $ibgeCode);
         }
+
         if ($uf) {
             $query->where('uf', $uf);
         }
 
         $cities = $query->get();
-        $count = 0;
-
-        // Resolve datas dinâmicas com janela de consolidação (Issue 1, 5)
-        // Usamos 2 semanas de lag pois os dados epidemiológicos demoram a ser notificados e validados
-        $consolidationLag = 2;
-        $now = Carbon::now();
-        $targetDate = $now->subWeeks($consolidationLag);
-
-        $currentYear = $targetDate->year;
-        $currentWeek = $targetDate->weekOfYear;
-
-        if ($currentWeek <= 0) {
-            $currentYear--;
-            $currentWeek = 52;
-        }
-
-        // Mapeamento de doenças para endpoints específicos
-        $isArbo = in_array($disease, ['dengue', 'zika', 'chikungunya']);
-        $url = $isArbo
-            ? 'https://info.dengue.mat.br/api/alertcity'
-            : 'https://infogripe.fiocruz.br/api/v1/dashboard/alertcity';
-
-        $apiDisease = ($disease === 'gripe') ? 'srag' : $disease;
-
         $chunks = $cities->chunk(10);
+        $totalRecords = 0;
+        $maxUpdatedAt = null;
 
         foreach ($chunks as $chunk) {
-            try {
-                $responses = Http::pool(fn ($pool) => $chunk->map(fn ($city) => $pool->as($city->ibge_code)->timeout(30)->get($url, [
-                    'disease' => $apiDisease,
-                    'geocode' => $city->ibge_code,
-                    'format' => 'json',
-                    'ew_start' => 1,
-                    'ey_start' => $currentYear,
-                    'ew_end' => $currentWeek,
-                    'ey_end' => $currentYear,
-                ])
-                )
-                );
+            $responses = Http::pool(fn ($pool) => $chunk->map(
+                fn ($city) => $pool->as($city->ibge_code)
+                    ->withOptions(['verify' => true])
+                    ->get($service->getUrl($disease), [
+                        'geocode' => $city->ibge_code,
+                        'disease' => $service->getApiDiseaseName($disease),
+                        'format' => 'json',
+                        'ew_start' => 1,
+                        'ey_start' => now()->year,
+                        'ew_end' => 53,
+                        'ey_end' => now()->year,
+                    ])
+            ));
 
-                foreach ($chunk as $city) {
-                    $response = $responses[$city->ibge_code] ?? null;
+            foreach ($chunk as $city) {
+                $response = $responses[$city->ibge_code];
 
-                    if ($response instanceof Response && $response->successful()) {
-                        $data = $response->json();
-                        if ($data && is_array($data)) {
-                            $processed = $this->persistData($city, $disease, $data);
-                            $count += $processed;
-                        }
-                    } else {
-                        // Log de erro específico por cidade (Issue 6)
-                        $errorMsg = 'No response';
-                        if ($response instanceof Response) {
-                            $errorMsg = 'HTTP '.$response->status();
-                        } elseif ($response instanceof \Throwable) {
-                            $errorMsg = 'Exception: '.$response->getMessage();
-                        }
+                if ($response instanceof Response && $response->successful()) {
+                    $data = $response->json();
+                    $recordsSaved = $this->persistData($city, $disease, $data);
+                    $totalRecords += $recordsSaved;
 
-                        Log::warning("Falha ao sincronizar cidade {$city->name} ({$city->ibge_code}): ".$errorMsg);
+                    if ($recordsSaved > 0) {
+                        $maxUpdatedAt = now();
                     }
-                }
-
-                // Atualiza o progresso na sessão (Issue 1, 2, 8)
-                if ($sessionId) {
-                    $session = SyncSession::where('session_id', $sessionId)->first();
-
-                    foreach ($chunk as $city) {
-                        // Evita contar a mesma cidade duas vezes na mesma sessão (Idempotência)
-                        $cacheKey = "sync_session_{$sessionId}_city_{$city->ibge_code}";
-                        if (Cache::add($cacheKey, true, now()->addHours(2))) {
-                            $session->increment('processed_cities');
-                        }
-                    }
-
-                    $session->increment('total_records_found', $count);
-
-                    // Adiciona log de progresso a cada 100 municípios (Menos spam no console)
-                    if ($session->processed_cities % 100 === 0) {
-                        SyncLog::create([
-                            'session_id' => $sessionId,
-                            'disease' => $disease,
-                            'level' => 'info',
-                            'message' => "Progresso: {$session->processed_cities} de {$session->total_cities} municípios processados ({$session->progress}%).",
-                        ]);
-                    }
-                }
-
-            } catch (\Exception $e) {
-                Log::error('Erro no chunk de sincronização: '.$e->getMessage());
-                if ($sessionId) {
-                    SyncSession::where('session_id', $sessionId)->update(['last_error' => $e->getMessage()]);
-                    SyncLog::create([
-                        'session_id' => $sessionId,
-                        'disease' => $disease,
-                        'level' => 'error',
-                        'message' => 'Erro no processamento: '.$e->getMessage(),
-                    ]);
+                } else {
+                    Log::error("Falha ao sincronizar cidade {$city->ibge_code}: ".($response?->body() ?? 'No response'));
                 }
             }
         }
 
-        // Atualiza a View Materializada e limpa cache de inteligência sempre ao final do sync
-        try {
-            Artisan::call('app:refresh-stats-view');
+        return [
+            'records_saved' => $totalRecords,
+            'last_sync_at' => $maxUpdatedAt,
+        ];
+    }
 
-            // Limpa chaves globais de inteligência (visão nacional)
-            $currentYear = now()->year;
-            Cache::forget("epi_intel_national_{$currentYear}_{$disease}");
-            Cache::forget('epi_intel_national_'.($currentYear - 1)."_{$disease}");
-
-        } catch (\Exception $e) {
-            \Log::error('Falha na automação pós-sync: '.$e->getMessage());
-        }
-
-        if ($sessionId && $uf) {
-            $session = SyncSession::where('session_id', $sessionId)->first();
-
-            // Verifica se é o encerramento total da sessão
-            if ($session->processed_cities >= $session->total_cities && $session->status !== 'finished') {
-                $session->update(['status' => 'finished', 'completed_at' => now()]);
-
-                SyncLog::create([
-                    'session_id' => $sessionId,
-                    'disease' => $disease,
-                    'level' => 'success',
-                    'message' => "🏁 Sincronização de {$disease} CONCLUÍDA! View Materializada e Cache atualizados.",
-                ]);
-            }
-        }
-
-        return $count;
+    protected function getService(string $disease): object
+    {
+        return str_contains($disease, 'gripe') ? $this->gripeService : $this->dengueService;
     }
 
     protected function persistData(City $city, string $disease, array $data): int
     {
-        $inserted = 0;
+        $count = 0;
+
         foreach ($data as $record) {
+            // Safety Guard: Ignora registros malformados ou incompletos
+            if (! isset($record['year']) || ! isset($record['epi_week'])) {
+                continue;
+            }
+
+            $currentCases = (int) ($record['casos'] ?? 0);
+
+            // Freshness Tracking: Captura a versão do modelo ou data de atualização da Fiocruz
+            $updatedAt = isset($record['versao_modelo'])
+                ? Carbon::parse($record['versao_modelo'])
+                : now();
+
             EpidemicRecord::updateOrCreate(
                 [
                     'city_id' => $city->id,
+                    'year' => $record['year'],
+                    'epi_week' => $record['epi_week'],
                     'disease_type' => $disease,
-                    'epi_week' => $record['epiweek'] ?? $record['epi_week'] ?? (isset($record['SE']) && is_numeric($record['SE']) && strlen($record['SE']) >= 6 ? ($record['SE'] % 100) : null),
-                    'year' => $record['eyear'] ?? $record['epi_year'] ?? (isset($record['SE']) && is_numeric($record['SE']) && strlen($record['SE']) >= 6 ? (int) ($record['SE'] / 100) : null),
                 ],
                 [
-                    'cases' => $record['casos'] ?? 0,
-                    'level' => $this->riskService->getAlertLevel(
-                        $record['incidencia'] ?? 0,
-                        $record['casos'] ?? 0,
-                        'stable' // Tendência não disponível no momento do sync unitário
-                    ),
-                    'incidence' => $record['incidencia'] ?? 0,
-                    're_inferior' => $record['re_inf'] ?? null,
-                    're_superior' => $record['re_sup'] ?? null,
-                    'population' => $record['pop'] ?? null,
-                    'status' => 'synced',
+                    'cases' => $currentCases,
+                    'population' => $city->population,
+                    'incidence' => ($currentCases / max($city->population, 1)) * 100000,
+                    'updated_at' => $updatedAt,
                 ]
             );
-            $inserted++;
+            $count++;
         }
 
-        return $inserted;
+        return $count;
     }
 }

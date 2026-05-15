@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\DB;
 
 class SqliteEpidemicRepository implements EpidemicRepositoryInterface
 {
-    public function getLatestRecordsByUf(string $uf, int $year, string $disease, int $latestWeek): Collection
+    public function getLatestRecordsByUf(string $uf, int $year, string $disease, ?int $latestWeek): Collection
     {
+        if ($latestWeek === null) {
+            return collect();
+        }
+
         $totalsSubquery = EpidemicRecord::query()
             ->select('city_id', DB::raw('SUM(cases) as total_cases'))
             ->where('year', $year)
@@ -20,13 +24,13 @@ class SqliteEpidemicRepository implements EpidemicRepositoryInterface
         return EpidemicRecord::query()
             ->select('epidemic_records.*')
             ->selectRaw('COALESCE(totals.total_cases, 0) as total_cases')
-            ->selectRaw('NULL as lng, NULL as lat') // SQLite handles location as text or null
+            ->selectRaw('0 as lng, 0 as lat') // SQLite no spatial support
             ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
             ->leftJoinSub($totalsSubquery, 'totals', 'totals.city_id', '=', 'epidemic_records.city_id')
             ->where('cities.uf', $uf)
             ->where('epidemic_records.year', $year)
             ->where('epidemic_records.disease_type', $disease)
-            ->groupBy('epidemic_records.city_id') // Basic deduplication for SQLite
+            ->where('epidemic_records.epi_week', $latestWeek)
             ->with('city')
             ->get();
     }
@@ -37,7 +41,6 @@ class SqliteEpidemicRepository implements EpidemicRepositoryInterface
             return collect();
         }
 
-        // In SQLite, mv_uf_epidemic_stats is a standard VIEW
         return DB::table('mv_uf_epidemic_stats')
             ->select('uf', 'total_cases', 'real_incidence as incidence')
             ->selectRaw('total_cases as new_cases')
@@ -47,8 +50,15 @@ class SqliteEpidemicRepository implements EpidemicRepositoryInterface
             ->get();
     }
 
-    public function getUfGlobalStats(string $uf, int $year, string $disease, int $latestWeek): array
+    public function getUfGlobalStats(string $uf, int $year, string $disease, ?int $latestWeek): array
     {
+        if ($latestWeek === null) {
+            return [
+                'uf_total_cases' => 0,
+                'uf_new_cases' => 0,
+            ];
+        }
+
         $stats = DB::selectOne('
             SELECT 
                 SUM(cases) as uf_total_cases,
@@ -81,7 +91,6 @@ class SqliteEpidemicRepository implements EpidemicRepositoryInterface
         return EpidemicRecord::query()
             ->where('city_id', $cityId)
             ->where('disease_type', $disease)
-            ->groupBy('year', 'epi_week')
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')
             ->limit($limit)
@@ -91,10 +100,10 @@ class SqliteEpidemicRepository implements EpidemicRepositoryInterface
     public function getUfHistoryForTrend(string $uf, string $disease, int $limit = 12): Collection
     {
         return DB::table('epidemic_records')
-            ->selectRaw('year, epi_week, SUM(cases) as cases')
             ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
             ->where('cities.uf', $uf)
             ->where('disease_type', $disease)
+            ->selectRaw('year, epi_week, SUM(cases) as cases')
             ->groupBy('year', 'epi_week')
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')

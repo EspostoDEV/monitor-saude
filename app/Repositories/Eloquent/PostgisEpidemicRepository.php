@@ -9,12 +9,28 @@ use Illuminate\Support\Facades\DB;
 
 class PostgisEpidemicRepository implements EpidemicRepositoryInterface
 {
-    public function getLatestRecordsByUf(string $uf, int $year, string $disease, int $latestWeek): Collection
+    public function getLatestRecordsByUf(string $uf, int $year, string $disease, ?int $latestWeek): Collection
     {
+        if ($latestWeek === null) {
+            return collect();
+        }
+
+        // Filter Push-down: Aplicando o filtro de UF dentro da subquery do DISTINCT ON
+        $subquery = '
+            SELECT DISTINCT ON (city_id) id 
+            FROM epidemic_records 
+            JOIN cities ON cities.id = epidemic_records.city_id
+            WHERE cities.uf = ? AND epidemic_records.year = ? AND epidemic_records.disease_type = ? 
+            ORDER BY city_id, updated_at DESC
+        ';
+
+        // Elite Optimization: Filtrando também os totais anuais pelo UF solicitado
         $totalsSubquery = EpidemicRecord::query()
             ->select('city_id', DB::raw('SUM(cases) as total_cases'))
-            ->where('year', $year)
-            ->where('disease_type', $disease)
+            ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
+            ->where('cities.uf', $uf)
+            ->where('epidemic_records.year', $year)
+            ->where('epidemic_records.disease_type', $disease)
             ->groupBy('city_id');
 
         return EpidemicRecord::query()
@@ -23,15 +39,7 @@ class PostgisEpidemicRepository implements EpidemicRepositoryInterface
             ->selectRaw('ST_X(cities.location::geometry) as lng, ST_Y(cities.location::geometry) as lat')
             ->join('cities', 'cities.id', '=', 'epidemic_records.city_id')
             ->leftJoinSub($totalsSubquery, 'totals', 'totals.city_id', '=', 'epidemic_records.city_id')
-            ->where('cities.uf', $uf)
-            ->where('epidemic_records.year', $year)
-            ->where('epidemic_records.disease_type', $disease)
-            ->whereRaw('epidemic_records.id IN (
-                SELECT DISTINCT ON (city_id) id 
-                FROM epidemic_records 
-                WHERE year = ? AND disease_type = ? 
-                ORDER BY city_id, updated_at DESC
-            )', [$year, $disease])
+            ->whereRaw("epidemic_records.id IN ($subquery)", [$uf, $year, $disease])
             ->with('city')
             ->get();
     }
@@ -51,8 +59,15 @@ class PostgisEpidemicRepository implements EpidemicRepositoryInterface
             ->get();
     }
 
-    public function getUfGlobalStats(string $uf, int $year, string $disease, int $latestWeek): array
+    public function getUfGlobalStats(string $uf, int $year, string $disease, ?int $latestWeek): array
     {
+        if ($latestWeek === null) {
+            return [
+                'uf_total_cases' => 0,
+                'uf_new_cases' => 0,
+            ];
+        }
+
         $stats = DB::selectOne('
             SELECT 
                 SUM(cases) as uf_total_cases,
@@ -100,18 +115,18 @@ class PostgisEpidemicRepository implements EpidemicRepositoryInterface
 
     public function getUfHistoryForTrend(string $uf, string $disease, int $limit = 12): Collection
     {
+        // Filter Push-down aplicado também na tendência por UF
         $deduplicatedSubquery = '
             SELECT DISTINCT ON (city_id, year, epi_week) * 
             FROM epidemic_records 
-            WHERE disease_type = ? 
+            JOIN cities ON cities.id = epidemic_records.city_id
+            WHERE cities.uf = ? AND disease_type = ? 
             ORDER BY city_id, year DESC, epi_week DESC, updated_at DESC
         ';
 
         return DB::table(DB::raw("($deduplicatedSubquery) as records"))
-            ->setBindings([$disease])
+            ->setBindings([$uf, $disease])
             ->selectRaw('year, epi_week, SUM(cases) as cases')
-            ->join('cities', 'cities.id', '=', 'records.city_id')
-            ->where('cities.uf', $uf)
             ->groupBy('year', 'epi_week')
             ->orderBy('year', 'desc')
             ->orderBy('epi_week', 'desc')
