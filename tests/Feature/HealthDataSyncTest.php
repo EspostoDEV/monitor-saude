@@ -42,7 +42,7 @@ class HealthDataSyncTest extends TestCase
 
         // Restringindo o mock para evitar falsos positivos
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200),
+            'https://info.dengue.mat.br/api/alertcity*' => Http::response($mockResponse, 200),
         ]);
 
         // WHEN
@@ -66,7 +66,7 @@ class HealthDataSyncTest extends TestCase
         $city = City::factory()->create();
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response([], 500),
+            'https://info.dengue.mat.br/api/alertcity*' => Http::response([], 500),
         ]);
 
         // WHEN
@@ -101,7 +101,7 @@ class HealthDataSyncTest extends TestCase
         ];
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response($mockResponse, 200),
+            'https://info.dengue.mat.br/api/alertcity*' => Http::response($mockResponse, 200),
         ]);
 
         // WHEN
@@ -128,7 +128,7 @@ class HealthDataSyncTest extends TestCase
         ]);
 
         Http::fake([
-            'https://info.dengue.mat.br/api/alert/*' => Http::response([['epi_week' => 1, 'epi_year' => 2026, 'casos' => 10]], 200),
+            'https://info.dengue.mat.br/api/alertcity*' => Http::response([['epi_week' => 1, 'epi_year' => 2026, 'casos' => 10]], 200),
         ]);
 
         // WHEN

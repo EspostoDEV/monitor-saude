@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Log;
 
 class HealthDataService
 {
-    protected string $baseUrl = 'https://info.dengue.mat.br/api/alert/';
-
     protected RiskEngineService $riskService;
 
     public function __construct(RiskEngineService $riskService)
@@ -54,12 +52,20 @@ class HealthDataService
             $currentWeek = 52;
         }
 
-        $chunks = $cities->chunk(10); // Aumentado para 10 pois agora temos melhor controle
+        // Mapeamento de doenças para endpoints específicos
+        $isArbo = in_array($disease, ['dengue', 'zika', 'chikungunya']);
+        $url = $isArbo 
+            ? 'https://info.dengue.mat.br/api/alertcity'
+            : 'https://infogripe.fiocruz.br/api/v1/dashboard/alertcity';
+
+        $apiDisease = ($disease === 'gripe') ? 'srag' : $disease;
+
+        $chunks = $cities->chunk(10);
 
         foreach ($chunks as $chunk) {
             try {
-                $responses = Http::pool(fn ($pool) => $chunk->map(fn ($city) => $pool->as($city->ibge_code)->timeout(30)->get($this->baseUrl, [
-                    'disease' => $disease,
+                $responses = Http::pool(fn ($pool) => $chunk->map(fn ($city) => $pool->as($city->ibge_code)->timeout(30)->get($url, [
+                    'disease' => $apiDisease,
                     'geocode' => $city->ibge_code,
                     'format' => 'json',
                     'ew_start' => 1,
@@ -131,32 +137,25 @@ class HealthDataService
             }
         }
 
+        // Atualiza a View Materializada e limpa cache de inteligência sempre ao final do sync
+        try {
+            Artisan::call('app:refresh-stats-view');
+
+            // Limpa chaves globais de inteligência (visão nacional)
+            $currentYear = now()->year;
+            Cache::forget("epi_intel_national_{$currentYear}_{$disease}");
+            Cache::forget('epi_intel_national_'.($currentYear - 1)."_{$disease}");
+
+        } catch (\Exception $e) {
+            \Log::error('Falha na automação pós-sync: '.$e->getMessage());
+        }
+
         if ($sessionId && $uf) {
             $session = SyncSession::where('session_id', $sessionId)->first();
-
-            SyncLog::create([
-                'session_id' => $sessionId,
-                'disease' => $disease,
-                'level' => 'success',
-                'message' => "Lote da UF {$uf} processado. ({$session->processed_cities}/{$session->total_cities})",
-            ]);
 
             // Verifica se é o encerramento total da sessão
             if ($session->processed_cities >= $session->total_cities && $session->status !== 'finished') {
                 $session->update(['status' => 'finished', 'completed_at' => now()]);
-
-                // Automação Roadmap 2.2: Atualiza a View Materializada e limpa cache de inteligência
-                try {
-                    Artisan::call('app:refresh-stats-view');
-
-                    // Limpa chaves globais de inteligência (visão nacional)
-                    $currentYear = now()->year;
-                    Cache::forget("epi_intel_national_{$currentYear}_{$disease}");
-                    Cache::forget('epi_intel_national_'.($currentYear - 1)."_{$disease}");
-
-                } catch (\Exception $e) {
-                    \Log::error('Falha na automação pós-sync: '.$e->getMessage());
-                }
 
                 SyncLog::create([
                     'session_id' => $sessionId,
@@ -178,8 +177,8 @@ class HealthDataService
                 [
                     'city_id' => $city->id,
                     'disease_type' => $disease,
-                    'epi_week' => $record['epiweek'] ?? $record['epi_week'],
-                    'year' => $record['eyear'] ?? $record['epi_year'],
+                    'epi_week' => $record['epiweek'] ?? $record['epi_week'] ?? (isset($record['SE']) && is_numeric($record['SE']) && strlen($record['SE']) >= 6 ? ($record['SE'] % 100) : null),
+                    'year' => $record['eyear'] ?? $record['epi_year'] ?? (isset($record['SE']) && is_numeric($record['SE']) && strlen($record['SE']) >= 6 ? (int) ($record['SE'] / 100) : null),
                 ],
                 [
                     'cases' => $record['casos'] ?? 0,

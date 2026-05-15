@@ -140,7 +140,7 @@ export default function Dashboard({ records, filters, stats }) {
         const data = stateDataMap[uf];
         const isHovered = hoveredUf === uf;
         return {
-            fillColor: data ? getLevelColor(data.level, isHovered ? 0.8 : 0.4) : 'transparent',
+            fillColor: data ? getLevelColor(data.level, isHovered ? 0.8 : 0.4) : 'rgba(255, 255, 255, 0.05)',
             weight: isHovered ? 3 : 1,
             opacity: 1,
             color: isHovered ? '#fff' : '#334155',

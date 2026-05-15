@@ -31,8 +31,8 @@ class HealthSyncCommand extends Command
         $disease = $this->argument('disease');
         $ibgeCode = $this->option('ibge');
 
-        if (! in_array($disease, ['dengue', 'chikungunya', 'zika'])) {
-            $this->error('Doença inválida. Use: dengue, chikungunya ou zika.');
+        if (! in_array($disease, ['dengue', 'chikungunya', 'zika', 'gripe'])) {
+            $this->error('Doença inválida. Use: dengue, chikungunya, zika ou gripe.');
 
             return 1;
         }

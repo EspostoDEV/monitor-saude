@@ -31,8 +31,8 @@ class EpidemicController extends Controller
             'year' => 'nullable|integer',
         ]);
 
-        $year = $request->year ?? EpidemicRecord::max('year') ?? 2024;
         $disease = $request->disease ?? 'dengue';
+        $year = $request->year ?? EpidemicRecord::where('disease_type', $disease)->max('year') ?? 2024;
         $uf = $request->uf;
 
         // 1. Resolvemos a última semana e última sincronização (Global para o contexto de ano/doença)
